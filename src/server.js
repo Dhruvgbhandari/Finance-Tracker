@@ -1,0 +1,81 @@
+const express = require('express');
+const session = require('express-session');
+const MemoryStore = require('memorystore')(session);
+const helmet = require('helmet');
+const path = require('path');
+const { initDatabase } = require('./db/database');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Security headers
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:"],
+            connectSrc: ["'self'"],
+        },
+    },
+}));
+
+// Body parsing
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Session configuration
+app.use(session({
+    store: new MemoryStore({
+        checkPeriod: 86400000, // prune expired entries every 24h
+    }),
+    secret: 'moneytrack-secret-key-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: false,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        sameSite: 'lax',
+    },
+}));
+
+// Static files
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// API Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/transactions', require('./routes/transactions'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+
+// SPA fallback
+app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    }
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+    console.error('Server Error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
+// Initialize DB then start server
+async function start() {
+    try {
+        await initDatabase();
+        console.log('✅ Database initialized');
+
+        app.listen(PORT, () => {
+            console.log(`🚀 MoneyTrack running at http://localhost:${PORT}`);
+        });
+    } catch (err) {
+        console.error('❌ Failed to start:', err);
+        process.exit(1);
+    }
+}
+
+start();
