@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MoneyTrack — Savings Goals">
+    <title>MoneyTrack — Savings Goals</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">💰 MoneyTrack</div>
+                <button class="sidebar-close" id="sidebar-close">✕</button>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard.html" class="nav-link" data-page="dashboard"><span
+                        class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/budget.html" class="nav-link" data-page="budget"><span
+                        class="nav-icon">💳</span><span>Budgets</span></a>
+                <a href="/goals.html" class="nav-link active" data-page="goals"><span
+                        class="nav-icon">🎯</span><span>Savings Goals</span></a>
+                <a href="/analytics.html" class="nav-link" data-page="analytics"><span
+                        class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/recurring.html" class="nav-link" data-page="recurring"><span
+                        class="nav-icon">🔁</span><span>Recurring</span></a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">D</div><span class="user-email" id="user-email"></span>
+                </div>
+                <button class="btn-logout" id="logout-btn">Sign Out</button>
+            </div>
+        </aside>
+
+        <header class="mobile-header">
+            <button class="hamburger" id="hamburger-btn"><span></span><span></span><span></span></button>
+            <div class="brand">💰 MoneyTrack</div>
+            <div></div>
+        </header>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1>🎯 Savings Goals</h1>
+                    <p class="page-subtitle">Track progress towards your financial goals</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary btn-sm" id="add-goal-btn">+ New Goal</button>
+                </div>
+            </div>
+
+            <div class="goals-grid" id="goals-grid">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <div class="empty-state" id="goals-empty" style="display:none;">
+                <div class="empty-icon">🎯</div>
+                <h3>No savings goals yet</h3>
+                <p>Set your first goal — saving for a phone, vacation, or emergency fund!</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Goal Modal -->
+    <div class="modal-overlay" id="goal-modal">
+        <div class="modal" style="max-width:440px;">
+            <h2>
+                <span id="goal-modal-title">New Savings Goal</span>
+                <button class="btn-icon" id="goal-modal-close">✕</button>
+            </h2>
+            <div class="error-msg" id="goal-modal-error"></div>
+            <form id="goal-form">
+                <input type="hidden" id="goal-edit-id" value="">
+                <div class="form-group">
+                    <label for="goal-name">Goal Name</label>
+                    <input type="text" id="goal-name" placeholder="e.g. New Laptop" maxlength="100" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="goal-target">Target Amount (₹)</label>
+                        <input type="number" id="goal-target" placeholder="e.g. 50000" step="0.01" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="goal-deadline">Deadline (optional)</label>
+                        <input type="date" id="goal-deadline">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Icon</label>
+                    <div class="icon-picker" id="icon-picker">
+                        <button type="button" class="icon-option active" data-icon="🎯">🎯</button>
+                        <button type="button" class="icon-option" data-icon="🏠">🏠</button>
+                        <button type="button" class="icon-option" data-icon="🚗">🚗</button>
+                        <button type="button" class="icon-option" data-icon="✈️">✈️</button>
+                        <button type="button" class="icon-option" data-icon="💻">💻</button>
+                        <button type="button" class="icon-option" data-icon="📱">📱</button>
+                        <button type="button" class="icon-option" data-icon="🎓">🎓</button>
+                        <button type="button" class="icon-option" data-icon="💍">💍</button>
+                        <button type="button" class="icon-option" data-icon="🏖️">🏖️</button>
+                        <button type="button" class="icon-option" data-icon="💰">💰</button>
+                        <button type="button" class="icon-option" data-icon="🎮">🎮</button>
+                        <button type="button" class="icon-option" data-icon="📸">📸</button>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-ghost" id="goal-modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="goal-modal-submit">Create Goal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Contribute Modal -->
+    <div class="modal-overlay" id="contribute-modal">
+        <div class="modal" style="max-width:380px;">
+            <h2>
+                <span>Add Contribution</span>
+                <button class="btn-icon" id="contribute-modal-close">✕</button>
+            </h2>
+            <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.25rem;" id="contribute-goal-name">
+            </p>
+            <form id="contribute-form">
+                <input type="hidden" id="contribute-goal-id" value="">
+                <div class="form-group">
+                    <label for="contribute-amount">Amount (₹)</label>
+                    <input type="number" id="contribute-amount" placeholder="e.g. 2000" step="0.01" min="1" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-ghost" id="contribute-modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/goals.js"></script>
+</body>
+
+</html>

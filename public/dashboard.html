@@ -23,17 +23,69 @@
     <div class="toast-container" id="toast-container"></div>
 
     <div class="app-layout">
-        <!-- Navbar -->
-        <nav class="navbar">
-            <div class="brand">💰 MoneyTrack</div>
-            <div class="nav-right">
-                <span class="user-email" id="user-email"></span>
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">💰 MoneyTrack</div>
+                <button class="sidebar-close" id="sidebar-close">✕</button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/dashboard.html" class="nav-link active" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/budget.html" class="nav-link" data-page="budget">
+                    <span class="nav-icon">💳</span>
+                    <span>Budgets</span>
+                </a>
+                <a href="/goals.html" class="nav-link" data-page="goals">
+                    <span class="nav-icon">🎯</span>
+                    <span>Savings Goals</span>
+                </a>
+                <a href="/analytics.html" class="nav-link" data-page="analytics">
+                    <span class="nav-icon">📈</span>
+                    <span>Analytics</span>
+                </a>
+                <a href="/recurring.html" class="nav-link" data-page="recurring">
+                    <span class="nav-icon">🔁</span>
+                    <span>Recurring</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">D</div>
+                    <span class="user-email" id="user-email"></span>
+                </div>
                 <button class="btn-logout" id="logout-btn">Sign Out</button>
             </div>
-        </nav>
+        </aside>
+
+        <!-- Mobile Header -->
+        <header class="mobile-header">
+            <button class="hamburger" id="hamburger-btn">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="brand">💰 MoneyTrack</div>
+            <div></div>
+        </header>
 
         <!-- Main Content -->
         <main class="main-content">
+            <!-- Page Title -->
+            <div class="page-header">
+                <div>
+                    <h1>Dashboard</h1>
+                    <p class="page-subtitle">Your financial overview at a glance</p>
+                </div>
+                <div class="header-actions">
+                    <div class="month-picker">
+                        <input type="month" id="month-picker" title="Select month">
+                    </div>
+                </div>
+            </div>
+
             <!-- Summary Cards -->
             <div class="summary-grid">
                 <div class="summary-card starting" id="starting-balance-card"
@@ -74,6 +126,23 @@
                     <div class="card-value" id="current-balance">₹0</div>
                     <div class="card-sub" id="balance-sub">Starting + Income − Expenses</div>
                 </div>
+
+                <div class="summary-card savings-rate">
+                    <div class="card-label">
+                        <div class="card-icon">📈</div>
+                        Savings Rate
+                    </div>
+                    <div class="card-value" id="savings-rate">0%</div>
+                    <div class="card-sub">Of income saved</div>
+                </div>
+            </div>
+
+            <!-- Smart Insights -->
+            <div class="insights-panel" id="insights-panel">
+                <h3>💡 Smart Insights</h3>
+                <div class="insights-grid" id="insights-grid">
+                    <!-- Dynamically filled -->
+                </div>
             </div>
 
             <!-- Charts -->
@@ -97,6 +166,11 @@
             <div class="section-header">
                 <h2>Transaction History</h2>
                 <div class="filters">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Search transactions..." class="search-input">
+                    </div>
+                    <input type="date" id="date-from" class="date-input" title="From date">
+                    <input type="date" id="date-to" class="date-input" title="To date">
                     <select id="filter-category">
                         <option value="">All Categories</option>
                         <option value="Food">🍔 Food</option>
@@ -112,6 +186,7 @@
                         <option value="income">Income</option>
                         <option value="expense">Expense</option>
                     </select>
+                    <button class="btn btn-ghost btn-sm" id="export-csv-btn" title="Export CSV">📥 Export</button>
                     <button class="btn btn-primary btn-sm" id="add-transaction-btn">+ Add Transaction</button>
                 </div>
             </div>

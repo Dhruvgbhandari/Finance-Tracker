@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MoneyTrack — Recurring Transactions">
+    <title>MoneyTrack — Recurring</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">💰 MoneyTrack</div>
+                <button class="sidebar-close" id="sidebar-close">✕</button>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard.html" class="nav-link" data-page="dashboard"><span
+                        class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/budget.html" class="nav-link" data-page="budget"><span
+                        class="nav-icon">💳</span><span>Budgets</span></a>
+                <a href="/goals.html" class="nav-link" data-page="goals"><span class="nav-icon">🎯</span><span>Savings
+                        Goals</span></a>
+                <a href="/analytics.html" class="nav-link" data-page="analytics"><span
+                        class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/recurring.html" class="nav-link active" data-page="recurring"><span
+                        class="nav-icon">🔁</span><span>Recurring</span></a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">D</div><span class="user-email" id="user-email"></span>
+                </div>
+                <button class="btn-logout" id="logout-btn">Sign Out</button>
+            </div>
+        </aside>
+
+        <header class="mobile-header">
+            <button class="hamburger" id="hamburger-btn"><span></span><span></span><span></span></button>
+            <div class="brand">💰 MoneyTrack</div>
+            <div></div>
+        </header>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1>🔁 Recurring Transactions</h1>
+                    <p class="page-subtitle">Manage repeating income & expenses</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary btn-sm" id="add-recurring-btn">+ Add Recurring</button>
+                </div>
+            </div>
+
+            <div class="recurring-grid" id="recurring-grid">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <div class="empty-state" id="recurring-empty" style="display:none;">
+                <div class="empty-icon">🔁</div>
+                <h3>No recurring transactions</h3>
+                <p>Set up automatic repeating income or expenses like rent, salary, or subscriptions.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Recurring Modal -->
+    <div class="modal-overlay" id="recurring-modal">
+        <div class="modal" style="max-width:460px;">
+            <h2>
+                <span>Add Recurring Transaction</span>
+                <button class="btn-icon" id="recurring-modal-close">✕</button>
+            </h2>
+            <div class="error-msg" id="recurring-modal-error"></div>
+            <form id="recurring-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="rec-type">Type</label>
+                        <select id="rec-type" required>
+                            <option value="expense">Expense</option>
+                            <option value="income">Income</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rec-amount">Amount (₹)</label>
+                        <input type="number" id="rec-amount" placeholder="0.00" step="0.01" min="0.01" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="rec-category">Category</label>
+                        <select id="rec-category" required>
+                            <option value="Food">🍔 Food</option>
+                            <option value="Transport">🚗 Transport</option>
+                            <option value="Rent">🏠 Rent</option>
+                            <option value="Entertainment">🎬 Entertainment</option>
+                            <option value="Utilities">⚡ Utilities</option>
+                            <option value="Salary">💼 Salary</option>
+                            <option value="Other">📦 Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rec-frequency">Frequency</label>
+                        <select id="rec-frequency" required>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="rec-start-date">Start Date</label>
+                        <input type="date" id="rec-start-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="rec-description">Description</label>
+                        <input type="text" id="rec-description" placeholder="e.g. Netflix">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-ghost" id="recurring-modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/recurring.js"></script>
+</body>
+
+</html>

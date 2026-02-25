@@ -17,6 +17,9 @@ router.get('/', requireAuth, (req, res) => {
         const offset = (page - 1) * limit;
         const category = req.query.category;
         const type = req.query.type;
+        const search = req.query.search;
+        const dateFrom = req.query.dateFrom;
+        const dateTo = req.query.dateTo;
         const sortOrder = req.query.sort === 'asc' ? 'ASC' : 'DESC';
 
         let whereClause = 'WHERE user_id = ?';
@@ -30,6 +33,22 @@ router.get('/', requireAuth, (req, res) => {
         if (type && VALID_TYPES.includes(type)) {
             whereClause += ' AND type = ?';
             params.push(type);
+        }
+
+        if (search && search.trim()) {
+            whereClause += ' AND (description LIKE ? OR category LIKE ?)';
+            const searchTerm = `%${search.trim()}%`;
+            params.push(searchTerm, searchTerm);
+        }
+
+        if (dateFrom) {
+            whereClause += ' AND date >= ?';
+            params.push(dateFrom);
+        }
+
+        if (dateTo) {
+            whereClause += ' AND date <= ?';
+            params.push(dateTo);
         }
 
         // Get total count
@@ -53,6 +72,31 @@ router.get('/', requireAuth, (req, res) => {
         });
     } catch (err) {
         console.error('Get transactions error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// GET /api/transactions/export/csv
+router.get('/export/csv', requireAuth, (req, res) => {
+    try {
+        const userId = req.session.userId;
+        const transactions = queryAll(
+            'SELECT date, type, category, amount, description FROM transactions WHERE user_id = ? ORDER BY date DESC',
+            [userId]
+        );
+
+        const header = 'Date,Type,Category,Amount,Description\n';
+        const rows = transactions.map(t => {
+            const desc = (t.description || '').replace(/"/g, '""');
+            return `${t.date},${t.type},${t.category},${t.amount},"${desc}"`;
+        }).join('\n');
+
+        const csv = header + rows;
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=moneytrack-transactions.csv');
+        res.send(csv);
+    } catch (err) {
+        console.error('Export CSV error:', err);
         res.status(500).json({ error: 'Server error' });
     }
 });

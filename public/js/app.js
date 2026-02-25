@@ -9,6 +9,7 @@
     let sortOrder = 'desc';
     let categoryChart = null;
     let monthlyChart = null;
+    let searchTimeout = null;
 
     // ---- DOM References ----
     const $ = (sel) => document.querySelector(sel);
@@ -16,16 +17,23 @@
 
     const loadingOverlay = $('#loading-overlay');
     const userEmail = $('#user-email');
+    const userAvatar = $('#user-avatar');
     const logoutBtn = $('#logout-btn');
     const totalIncome = $('#total-income');
     const totalExpenses = $('#total-expenses');
     const currentBalance = $('#current-balance');
+    const savingsRateEl = $('#savings-rate');
     const transactionsBody = $('#transactions-body');
     const paginationEl = $('#pagination');
     const filterCategory = $('#filter-category');
     const filterType = $('#filter-type');
+    const searchInput = $('#search-input');
+    const dateFrom = $('#date-from');
+    const dateTo = $('#date-to');
     const sortDateBtn = $('#sort-date');
     const addTransactionBtn = $('#add-transaction-btn');
+    const exportCsvBtn = $('#export-csv-btn');
+    const monthPicker = $('#month-picker');
     const modalOverlay = $('#transaction-modal');
     const modalTitle = $('#modal-title');
     const modalClose = $('#modal-close');
@@ -39,6 +47,19 @@
     const txnCategory = $('#txn-category');
     const txnDate = $('#txn-date');
     const txnDescription = $('#txn-description');
+    const insightsGrid = $('#insights-grid');
+
+    // ---- Sidebar ----
+    const sidebar = $('#sidebar');
+    const hamburgerBtn = $('#hamburger-btn');
+    const sidebarClose = $('#sidebar-close');
+
+    if (hamburgerBtn) {
+        hamburgerBtn.addEventListener('click', () => sidebar.classList.add('open'));
+    }
+    if (sidebarClose) {
+        sidebarClose.addEventListener('click', () => sidebar.classList.remove('open'));
+    }
 
     // ---- Helpers ----
     function formatCurrency(amount) {
@@ -55,6 +76,10 @@
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
 
+    function getSelectedMonth() {
+        return monthPicker && monthPicker.value ? monthPicker.value : getCurrentMonth();
+    }
+
     function getMonthLabel(monthStr) {
         const [year, month] = monthStr.split('-');
         const date = new Date(year, month - 1);
@@ -62,23 +87,13 @@
     }
 
     const categoryEmojis = {
-        'Food': '🍔',
-        'Transport': '🚗',
-        'Rent': '🏠',
-        'Entertainment': '🎬',
-        'Utilities': '⚡',
-        'Salary': '💼',
-        'Other': '📦',
+        'Food': '🍔', 'Transport': '🚗', 'Rent': '🏠', 'Entertainment': '🎬',
+        'Utilities': '⚡', 'Salary': '💼', 'Other': '📦',
     };
 
     const categoryColors = {
-        'Food': '#f97316',
-        'Transport': '#3b82f6',
-        'Rent': '#a855f7',
-        'Entertainment': '#ec4899',
-        'Utilities': '#eab308',
-        'Salary': '#22c55e',
-        'Other': '#6b7280',
+        'Food': '#f97316', 'Transport': '#3b82f6', 'Rent': '#a855f7',
+        'Entertainment': '#ec4899', 'Utilities': '#eab308', 'Salary': '#22c55e', 'Other': '#6b7280',
     };
 
     function showToast(message, type = 'success') {
@@ -94,12 +109,10 @@
     async function checkAuth() {
         try {
             const res = await fetch('/api/auth/me');
-            if (!res.ok) {
-                window.location.href = '/';
-                return false;
-            }
+            if (!res.ok) { window.location.href = '/'; return false; }
             const data = await res.json();
-            userEmail.textContent = data.user.email;
+            if (userEmail) userEmail.textContent = data.user.email;
+            if (userAvatar) userAvatar.textContent = data.user.email.charAt(0).toUpperCase();
             return true;
         } catch {
             window.location.href = '/';
@@ -109,35 +122,68 @@
 
     // ---- Logout ----
     logoutBtn.addEventListener('click', async () => {
-        try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-        } finally {
-            window.location.href = '/';
-        }
+        try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { window.location.href = '/'; }
     });
+
+    // ---- Month Picker ----
+    if (monthPicker) {
+        monthPicker.value = getCurrentMonth();
+        monthPicker.addEventListener('change', () => refreshAll());
+    }
 
     // ---- Dashboard Summary ----
     async function loadSummary() {
         try {
-            const month = getCurrentMonth();
+            const month = getSelectedMonth();
             const res = await fetch(`/api/dashboard/summary?month=${month}`);
             const data = await res.json();
 
             totalIncome.textContent = formatCurrency(data.totalIncome);
             totalExpenses.textContent = formatCurrency(data.totalExpenses);
             currentBalance.textContent = formatCurrency(data.balance);
-
-            // Add color class based on balance positive/negative
             currentBalance.style.color = data.balance >= 0 ? 'var(--accent-blue)' : 'var(--accent-red)';
+
+            // Starting balance
+            const startingBalEl = $('#starting-balance');
+            if (startingBalEl) startingBalEl.textContent = formatCurrency(data.startingBalance || 0);
+
+            // Savings rate
+            const rate = data.totalIncome > 0 ? Math.round(((data.totalIncome - data.totalExpenses) / data.totalIncome) * 100) : 0;
+            if (savingsRateEl) {
+                savingsRateEl.textContent = rate + '%';
+                savingsRateEl.style.color = rate >= 20 ? 'var(--accent-green)' : rate >= 0 ? 'var(--accent-amber)' : 'var(--accent-red)';
+            }
         } catch (err) {
             console.error('Failed to load summary:', err);
+        }
+    }
+
+    // ---- Insights ----
+    async function loadInsights() {
+        try {
+            const res = await fetch('/api/analytics/insights');
+            const data = await res.json();
+
+            if (insightsGrid && data.insights) {
+                insightsGrid.innerHTML = data.insights.map(i => `
+                    <div class="insight-card insight-${i.type}">
+                        <div class="insight-icon">${i.icon}</div>
+                        <div class="insight-body">
+                            <div class="insight-title">${i.title}</div>
+                            <div class="insight-text">${i.text}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (err) {
+            console.error('Failed to load insights:', err);
         }
     }
 
     // ---- Category Chart ----
     async function loadCategoryChart() {
         try {
-            const month = getCurrentMonth();
+            const month = getSelectedMonth();
             const res = await fetch(`/api/dashboard/categories?month=${month}`);
             const data = await res.json();
 
@@ -321,9 +367,15 @@
         try {
             const category = filterCategory.value;
             const type = filterType.value;
+            const search = searchInput ? searchInput.value : '';
+            const dfrom = dateFrom ? dateFrom.value : '';
+            const dto = dateTo ? dateTo.value : '';
             let url = `/api/transactions?page=${currentPage}&limit=${pageLimit}&sort=${sortOrder}`;
             if (category) url += `&category=${encodeURIComponent(category)}`;
             if (type) url += `&type=${encodeURIComponent(type)}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            if (dfrom) url += `&dateFrom=${dfrom}`;
+            if (dto) url += `&dateTo=${dto}`;
 
             const res = await fetch(url);
             const data = await res.json();
@@ -365,7 +417,6 @@
             </tr>
         `).join('');
 
-        // Attach edit/delete handlers
         transactionsBody.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', () => openEditModal(transactions.find(t => t.id == btn.dataset.id)));
         });
@@ -413,11 +464,28 @@
     filterCategory.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
     filterType.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
 
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => { currentPage = 1; loadTransactions(); }, 300);
+        });
+    }
+
+    if (dateFrom) dateFrom.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
+    if (dateTo) dateTo.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
+
     sortDateBtn.addEventListener('click', () => {
         sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
         sortDateBtn.textContent = sortOrder === 'desc' ? 'Date ↓' : 'Date ↑';
         loadTransactions();
     });
+
+    // ---- CSV Export ----
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', () => {
+            window.location.href = '/api/transactions/export/csv';
+        });
+    }
 
     // ---- Modal ----
     function openAddModal() {
@@ -455,7 +523,6 @@
         if (e.target === modalOverlay) closeModal();
     });
 
-    // Escape key to close modal
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modalOverlay.classList.contains('active')) {
             closeModal();
@@ -531,6 +598,46 @@
         }
     }
 
+    // ---- Starting Balance Modal ----
+    const balanceModal = $('#balance-modal');
+    const balanceForm = $('#balance-form');
+    const editBalanceBtn = $('#edit-balance-btn');
+    const balanceModalClose = $('#balance-modal-close');
+    const balanceModalCancel = $('#balance-modal-cancel');
+    const startingBalanceCard = $('#starting-balance-card');
+
+    function openBalanceModal() {
+        balanceModal.classList.add('active');
+    }
+    function closeBalanceModal() {
+        balanceModal.classList.remove('active');
+    }
+
+    if (editBalanceBtn) editBalanceBtn.addEventListener('click', (e) => { e.stopPropagation(); openBalanceModal(); });
+    if (startingBalanceCard) startingBalanceCard.addEventListener('click', openBalanceModal);
+    if (balanceModalClose) balanceModalClose.addEventListener('click', closeBalanceModal);
+    if (balanceModalCancel) balanceModalCancel.addEventListener('click', closeBalanceModal);
+
+    if (balanceForm) {
+        balanceForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = parseFloat($('#starting-balance-input').value);
+            try {
+                const res = await fetch('/api/auth/balance', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ startingBalance: amount }),
+                });
+                if (!res.ok) throw new Error('Failed');
+                closeBalanceModal();
+                showToast('Starting balance updated!', 'success');
+                refreshAll();
+            } catch {
+                showToast('Failed to update balance', 'error');
+            }
+        });
+    }
+
     // ---- Refresh All Data ----
     async function refreshAll() {
         await Promise.all([
@@ -538,6 +645,7 @@
             loadCategoryChart(),
             loadMonthlyChart(),
             loadTransactions(),
+            loadInsights(),
         ]);
     }
 
@@ -548,7 +656,6 @@
 
         await refreshAll();
 
-        // Hide loading overlay
         loadingOverlay.classList.add('hidden');
         setTimeout(() => loadingOverlay.remove(), 500);
     }

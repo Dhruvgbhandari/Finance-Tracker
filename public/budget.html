@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MoneyTrack — Budget Manager">
+    <title>MoneyTrack — Budgets</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">💰 MoneyTrack</div>
+                <button class="sidebar-close" id="sidebar-close">✕</button>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard.html" class="nav-link" data-page="dashboard"><span
+                        class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/budget.html" class="nav-link active" data-page="budget"><span
+                        class="nav-icon">💳</span><span>Budgets</span></a>
+                <a href="/goals.html" class="nav-link" data-page="goals"><span class="nav-icon">🎯</span><span>Savings
+                        Goals</span></a>
+                <a href="/analytics.html" class="nav-link" data-page="analytics"><span
+                        class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/recurring.html" class="nav-link" data-page="recurring"><span
+                        class="nav-icon">🔁</span><span>Recurring</span></a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">D</div><span class="user-email" id="user-email"></span>
+                </div>
+                <button class="btn-logout" id="logout-btn">Sign Out</button>
+            </div>
+        </aside>
+
+        <header class="mobile-header">
+            <button class="hamburger" id="hamburger-btn"><span></span><span></span><span></span></button>
+            <div class="brand">💰 MoneyTrack</div>
+            <div></div>
+        </header>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1>💳 Budget Manager</h1>
+                    <p class="page-subtitle">Set monthly spending limits & track progress</p>
+                </div>
+                <div class="header-actions">
+                    <input type="month" id="budget-month" title="Select month">
+                    <button class="btn btn-primary btn-sm" id="add-budget-btn">+ Set Budget</button>
+                </div>
+            </div>
+
+            <!-- Budget Summary -->
+            <div class="budget-summary" id="budget-summary">
+                <div class="budget-summary-card">
+                    <span class="label">Total Budgeted</span>
+                    <span class="value" id="total-budgeted">₹0</span>
+                </div>
+                <div class="budget-summary-card">
+                    <span class="label">Total Spent</span>
+                    <span class="value spent" id="total-spent">₹0</span>
+                </div>
+                <div class="budget-summary-card">
+                    <span class="label">Remaining</span>
+                    <span class="value remaining" id="total-remaining">₹0</span>
+                </div>
+            </div>
+
+            <!-- Budget Cards -->
+            <div class="budget-grid" id="budget-grid">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <div class="empty-state" id="budget-empty" style="display:none;">
+                <div class="empty-icon">💳</div>
+                <h3>No budgets set</h3>
+                <p>Click "Set Budget" to create monthly spending limits for each category.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Budget Modal -->
+    <div class="modal-overlay" id="budget-modal">
+        <div class="modal" style="max-width:420px;">
+            <h2>
+                <span id="budget-modal-title">Set Budget</span>
+                <button class="btn-icon" id="budget-modal-close">✕</button>
+            </h2>
+            <div class="error-msg" id="budget-modal-error"></div>
+            <form id="budget-form">
+                <div class="form-group">
+                    <label for="budget-category">Category</label>
+                    <select id="budget-category" required>
+                        <option value="Food">🍔 Food</option>
+                        <option value="Transport">🚗 Transport</option>
+                        <option value="Rent">🏠 Rent</option>
+                        <option value="Entertainment">🎬 Entertainment</option>
+                        <option value="Utilities">⚡ Utilities</option>
+                        <option value="Other">📦 Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="budget-amount">Monthly Limit (₹)</label>
+                    <input type="number" id="budget-amount" placeholder="e.g. 5000" step="0.01" min="1" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-ghost" id="budget-modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/budget.js"></script>
+</body>
+
+</html>
