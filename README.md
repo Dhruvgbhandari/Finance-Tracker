@@ -82,6 +82,6 @@ docker run -p 3000:3000 moneytrack
 
 ## 🙏 Acknowledgments
 
-- Design inspired by Antigravity aesthetics.
 - Charts powered by Chart.js.
+
 
