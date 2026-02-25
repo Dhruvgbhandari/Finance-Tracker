@@ -79,11 +79,9 @@ docker build -t moneytrack .
 docker run -p 3000:3000 moneytrack
 ```
 
-## 📜 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
 - Design inspired by Antigravity aesthetics.
 - Charts powered by Chart.js.
+
