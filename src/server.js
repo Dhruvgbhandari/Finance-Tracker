@@ -49,6 +49,10 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/budgets', require('./routes/budgets'));
+app.use('/api/goals', require('./routes/goals'));
+app.use('/api/recurring', require('./routes/recurring'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 // SPA fallback
 app.get('*', (req, res) => {
