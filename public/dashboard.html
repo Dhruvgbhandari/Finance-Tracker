@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="MoneyTrack Dashboard — View your financial summary">
-    <title>MoneyTrack — Dashboard</title>
+    <meta name="description" content="MoneyTrack Dashboard — Your financial health overview">
+    <title>MoneyTrack — Financial Health Dashboard</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -34,6 +34,10 @@
                 <a href="/dashboard.html" class="nav-link active" data-page="dashboard">
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
+                </a>
+                <a href="/transactions.html" class="nav-link" data-page="transactions">
+                    <span class="nav-icon">💸</span>
+                    <span>Transactions</span>
                 </a>
                 <a href="/budget.html" class="nav-link" data-page="budget">
                     <span class="nav-icon">💳</span>
@@ -73,149 +77,107 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Page Title -->
+            <!-- Page Header -->
             <div class="page-header">
                 <div>
-                    <h1>Dashboard</h1>
-                    <p class="page-subtitle">Your financial overview at a glance</p>
+                    <h1>Financial Health Overview</h1>
+                    <p class="page-subtitle" id="greeting-text">Welcome back! Your finances are looking solid today.</p>
                 </div>
                 <div class="header-actions">
-                    <div class="month-picker">
-                        <input type="month" id="month-picker" title="Select month">
+                    <!-- Time Filter Tabs -->
+                    <div class="time-filter-tabs" id="time-filter-tabs">
+                        <button class="time-tab active" data-range="monthly">Monthly</button>
+                        <button class="time-tab" data-range="quarterly">Quarterly</button>
+                        <button class="time-tab" data-range="yearly">Yearly</button>
                     </div>
+                    <button class="btn btn-primary btn-sm" id="add-transaction-btn">+ Add Transaction</button>
                 </div>
             </div>
 
             <!-- Summary Cards -->
-            <div class="summary-grid">
-                <div class="summary-card starting" id="starting-balance-card"
-                    title="Click to set your starting balance">
-                    <div class="card-label">
-                        <div class="card-icon">🏦</div>
-                        Starting Balance
-                        <button class="btn-icon" id="edit-balance-btn" title="Edit starting balance"
-                            style="margin-left:auto;font-size:0.85rem;">✏️</button>
+            <div class="summary-grid summary-grid-3">
+                <div class="summary-card balance">
+                    <div class="card-top-row">
+                        <div class="card-label">
+                            <div class="card-icon">◆</div>
+                            Total Balance
+                        </div>
+                        <span class="card-change positive" id="balance-change">+2.4%</span>
                     </div>
-                    <div class="card-value" id="starting-balance" style="color:var(--accent-purple);">₹0</div>
-                    <div class="card-sub">Money you already had</div>
+                    <div class="card-value" id="current-balance">₹0</div>
+                    <canvas class="sparkline-canvas" id="sparkline-balance" width="160" height="40"></canvas>
                 </div>
 
                 <div class="summary-card income">
-                    <div class="card-label">
-                        <div class="card-icon">↑</div>
-                        Total Income
+                    <div class="card-top-row">
+                        <div class="card-label">
+                            <div class="card-icon">↑</div>
+                            Monthly Income
+                        </div>
+                        <span class="card-change positive" id="income-change">+8.1%</span>
                     </div>
                     <div class="card-value" id="total-income">₹0</div>
-                    <div class="card-sub" id="income-sub">This month</div>
+                    <canvas class="sparkline-canvas" id="sparkline-income" width="160" height="40"></canvas>
                 </div>
 
                 <div class="summary-card expense">
-                    <div class="card-label">
-                        <div class="card-icon">↓</div>
-                        Total Expenses
+                    <div class="card-top-row">
+                        <div class="card-label">
+                            <div class="card-icon">↓</div>
+                            Monthly Expenses
+                        </div>
+                        <span class="card-change negative" id="expense-change">-2.3%</span>
                     </div>
                     <div class="card-value" id="total-expenses">₹0</div>
-                    <div class="card-sub" id="expense-sub">This month</div>
-                </div>
-
-                <div class="summary-card balance">
-                    <div class="card-label">
-                        <div class="card-icon">◆</div>
-                        Current Balance
-                    </div>
-                    <div class="card-value" id="current-balance">₹0</div>
-                    <div class="card-sub" id="balance-sub">Starting + Income − Expenses</div>
-                </div>
-
-                <div class="summary-card savings-rate">
-                    <div class="card-label">
-                        <div class="card-icon">📈</div>
-                        Savings Rate
-                    </div>
-                    <div class="card-value" id="savings-rate">0%</div>
-                    <div class="card-sub">Of income saved</div>
-                </div>
-            </div>
-
-            <!-- Smart Insights -->
-            <div class="insights-panel" id="insights-panel">
-                <h3>💡 Smart Insights</h3>
-                <div class="insights-grid" id="insights-grid">
-                    <!-- Dynamically filled -->
+                    <canvas class="sparkline-canvas" id="sparkline-expenses" width="160" height="40"></canvas>
                 </div>
             </div>
 
             <!-- Charts -->
             <div class="charts-grid">
                 <div class="chart-card">
-                    <h3>Expenses by Category</h3>
+                    <h3>Spending Over Time</h3>
                     <div class="chart-wrapper">
-                        <canvas id="category-chart"></canvas>
+                        <canvas id="spending-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="chart-card">
-                    <h3>Income vs Expenses (Monthly)</h3>
+                    <h3>Spending by Category</h3>
                     <div class="chart-wrapper">
-                        <canvas id="monthly-chart"></canvas>
+                        <canvas id="category-chart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Transaction History -->
-            <div class="section-header">
-                <h2>Transaction History</h2>
-                <div class="filters">
-                    <div class="search-box">
-                        <input type="text" id="search-input" placeholder="Search transactions..." class="search-input">
+            <!-- Bottom Row: Recent Transactions + Budget Status -->
+            <div class="dashboard-bottom-grid">
+                <!-- Recent Transactions -->
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <h3>Recent Transactions</h3>
+                        <a href="/transactions.html" class="view-all-link">View All →</a>
                     </div>
-                    <input type="date" id="date-from" class="date-input" title="From date">
-                    <input type="date" id="date-to" class="date-input" title="To date">
-                    <select id="filter-category">
-                        <option value="">All Categories</option>
-                        <option value="Food">🍔 Food</option>
-                        <option value="Transport">🚗 Transport</option>
-                        <option value="Rent">🏠 Rent</option>
-                        <option value="Entertainment">🎬 Entertainment</option>
-                        <option value="Utilities">⚡ Utilities</option>
-                        <option value="Salary">💼 Salary</option>
-                        <option value="Other">📦 Other</option>
-                    </select>
-                    <select id="filter-type">
-                        <option value="">All Types</option>
-                        <option value="income">Income</option>
-                        <option value="expense">Expense</option>
-                    </select>
-                    <button class="btn btn-ghost btn-sm" id="export-csv-btn" title="Export CSV">📥 Export</button>
-                    <button class="btn btn-primary btn-sm" id="add-transaction-btn">+ Add Transaction</button>
+                    <div class="recent-transactions-list" id="recent-transactions">
+                        <!-- Dynamically filled -->
+                    </div>
                 </div>
-            </div>
 
-            <div class="transactions-card">
-                <table class="transactions-table">
-                    <thead>
-                        <tr>
-                            <th id="sort-date">Date ↓</th>
-                            <th>Type</th>
-                            <th>Category</th>
-                            <th>Amount</th>
-                            <th>Description</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="transactions-body">
-                        <!-- Transactions will be dynamically rendered -->
-                    </tbody>
-                </table>
-
-                <div class="pagination" id="pagination">
-                    <!-- Pagination controls rendered via JS -->
+                <!-- Budget Status -->
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <h3>Budget Status</h3>
+                        <a href="/budget.html" class="view-all-link">Manage →</a>
+                    </div>
+                    <div class="budget-status-list" id="budget-status">
+                        <!-- Dynamically filled -->
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Add/Edit Transaction Modal -->
+    <!-- Quick Add Transaction Modal -->
     <div class="modal-overlay" id="transaction-modal">
         <div class="modal">
             <h2>
