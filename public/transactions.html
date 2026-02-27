@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MoneyTrack — Manage all your transactions">
+    <title>MoneyTrack — Transactions</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Loading transactions...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">💰 MoneyTrack</div>
+                <button class="sidebar-close" id="sidebar-close">✕</button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/dashboard.html" class="nav-link" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/transactions.html" class="nav-link active" data-page="transactions">
+                    <span class="nav-icon">💸</span>
+                    <span>Transactions</span>
+                </a>
+                <a href="/budget.html" class="nav-link" data-page="budget">
+                    <span class="nav-icon">💳</span>
+                    <span>Budgets</span>
+                </a>
+                <a href="/goals.html" class="nav-link" data-page="goals">
+                    <span class="nav-icon">🎯</span>
+                    <span>Savings Goals</span>
+                </a>
+                <a href="/analytics.html" class="nav-link" data-page="analytics">
+                    <span class="nav-icon">📈</span>
+                    <span>Analytics</span>
+                </a>
+                <a href="/recurring.html" class="nav-link" data-page="recurring">
+                    <span class="nav-icon">🔁</span>
+                    <span>Recurring</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">D</div>
+                    <span class="user-email" id="user-email"></span>
+                </div>
+                <button class="btn-logout" id="logout-btn">Sign Out</button>
+            </div>
+        </aside>
+
+        <!-- Mobile Header -->
+        <header class="mobile-header">
+            <button class="hamburger" id="hamburger-btn">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="brand">💰 MoneyTrack</div>
+            <div></div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Page Title -->
+            <div class="page-header">
+                <div>
+                    <h1>Transactions Ledger</h1>
+                    <p class="page-subtitle" id="txn-count-subtitle">Reviewing all transactions</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-ghost btn-sm" id="import-csv-btn">📤 Import CSV</button>
+                    <button class="btn btn-ghost btn-sm" id="export-csv-btn">📥 Export CSV</button>
+                    <button class="btn btn-primary btn-sm" id="add-transaction-btn">+ Add Transaction</button>
+                </div>
+            </div>
+
+            <!-- Filters Bar -->
+            <div class="txn-filters-bar">
+                <div class="txn-search-wrap">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="search-input" placeholder="Search by description, vendor, or category..."
+                        class="txn-search-input">
+                </div>
+                <div class="txn-filter-group">
+                    <input type="date" id="date-from" class="date-input" title="From date">
+                    <span class="date-separator">–</span>
+                    <input type="date" id="date-to" class="date-input" title="To date">
+                </div>
+                <select id="filter-category" class="txn-filter-select">
+                    <option value="">All Categories</option>
+                    <option value="Food">🍔 Food</option>
+                    <option value="Transport">🚗 Transport</option>
+                    <option value="Rent">🏠 Rent</option>
+                    <option value="Entertainment">🎬 Entertainment</option>
+                    <option value="Utilities">⚡ Utilities</option>
+                    <option value="Salary">💼 Salary</option>
+                    <option value="Other">📦 Other</option>
+                </select>
+                <select id="filter-type" class="txn-filter-select">
+                    <option value="">All Types</option>
+                    <option value="income">Income</option>
+                    <option value="expense">Expense</option>
+                </select>
+            </div>
+
+            <!-- Transactions Table -->
+            <div class="transactions-card">
+                <table class="transactions-table">
+                    <thead>
+                        <tr>
+                            <th id="sort-date" class="sortable">Date ↓</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th>Type</th>
+                            <th class="text-right">Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactions-body">
+                        <!-- Transactions will be dynamically rendered -->
+                    </tbody>
+                </table>
+
+                <div class="pagination" id="pagination">
+                    <!-- Pagination controls rendered via JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Transaction Modal -->
+    <div class="modal-overlay" id="transaction-modal">
+        <div class="modal">
+            <h2>
+                <span id="modal-title">Add Transaction</span>
+                <button class="btn-icon" id="modal-close">✕</button>
+            </h2>
+
+            <div class="error-msg" id="modal-error"></div>
+
+            <form id="transaction-form">
+                <input type="hidden" id="edit-id" value="">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="txn-type">Type</label>
+                        <select id="txn-type" required>
+                            <option value="expense">Expense</option>
+                            <option value="income">Income</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="txn-amount">Amount (₹)</label>
+                        <input type="number" id="txn-amount" placeholder="0.00" step="0.01" min="0.01" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="txn-category">Category</label>
+                        <select id="txn-category" required>
+                            <option value="Food">🍔 Food</option>
+                            <option value="Transport">🚗 Transport</option>
+                            <option value="Rent">🏠 Rent</option>
+                            <option value="Entertainment">🎬 Entertainment</option>
+                            <option value="Utilities">⚡ Utilities</option>
+                            <option value="Salary">💼 Salary</option>
+                            <option value="Other">📦 Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="txn-date">Date</label>
+                        <input type="date" id="txn-date" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="txn-description">Description (optional)</label>
+                    <input type="text" id="txn-description" placeholder="What was this for?">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="modal-submit">Add Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import CSV Modal -->
+    <div class="modal-overlay" id="import-modal">
+        <div class="modal">
+            <h2>
+                <span>Import Transactions from CSV</span>
+                <button class="btn-icon" id="import-modal-close">✕</button>
+            </h2>
+
+            <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;">Upload a CSV file with your
+                transactions. Required columns: <strong>Date</strong>, <strong>Amount</strong>. Optional: Type,
+                Category, Description.</p>
+
+            <div class="import-drop-zone" id="import-drop-zone">
+                <div class="drop-zone-icon">📄</div>
+                <p>Drag & drop a CSV file here</p>
+                <span>or</span>
+                <label class="btn btn-ghost btn-sm" for="csv-file-input"
+                    style="cursor:pointer;margin-top:0.5rem;">Browse Files</label>
+                <input type="file" id="csv-file-input" accept=".csv,text/csv" hidden>
+            </div>
+
+            <div class="import-file-info" id="import-file-info" style="display:none;">
+                <span class="import-file-name" id="import-file-name"></span>
+                <button class="btn-icon" id="import-file-remove" title="Remove">✕</button>
+            </div>
+
+            <div class="error-msg" id="import-error"></div>
+            <div class="import-success" id="import-success" style="display:none;"></div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" id="import-modal-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="import-submit" disabled>Import</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/transactions.js"></script>
+</body>
+
+</html>

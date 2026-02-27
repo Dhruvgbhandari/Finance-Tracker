@@ -101,6 +101,144 @@ router.get('/export/csv', requireAuth, (req, res) => {
     }
 });
 
+// POST /api/transactions/import/csv
+router.post('/import/csv', requireAuth, (req, res) => {
+    try {
+        const userId = req.session.userId;
+        const { csvData } = req.body;
+
+        if (!csvData || typeof csvData !== 'string') {
+            return res.status(400).json({ error: 'CSV data is required' });
+        }
+
+        // Parse CSV — handle quoted fields
+        const lines = csvData.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) {
+            return res.status(400).json({ error: 'CSV must have a header row and at least one data row' });
+        }
+
+        // Parse header (case-insensitive matching)
+        const headerRaw = parseCsvLine(lines[0]);
+        const header = headerRaw.map(h => h.trim().toLowerCase());
+
+        // Find column indices
+        const dateIdx = header.findIndex(h => h === 'date');
+        const typeIdx = header.findIndex(h => h === 'type');
+        const categoryIdx = header.findIndex(h => h === 'category');
+        const amountIdx = header.findIndex(h => h === 'amount');
+        const descIdx = header.findIndex(h => h === 'description' || h === 'desc' || h === 'note' || h === 'notes');
+
+        if (dateIdx === -1 || amountIdx === -1) {
+            return res.status(400).json({
+                error: 'CSV must contain at least "Date" and "Amount" columns. Optional: Type, Category, Description'
+            });
+        }
+
+        let imported = 0;
+        let skipped = 0;
+        const errors = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const fields = parseCsvLine(lines[i]);
+            if (fields.length === 0) continue;
+
+            try {
+                const date = fields[dateIdx]?.trim();
+                const amount = parseFloat(fields[amountIdx]?.trim());
+                let type = typeIdx !== -1 ? fields[typeIdx]?.trim().toLowerCase() : '';
+                let category = categoryIdx !== -1 ? fields[categoryIdx]?.trim() : 'Other';
+                const description = descIdx !== -1 ? (fields[descIdx]?.trim() || '') : '';
+
+                // Validate date
+                if (!date || isNaN(Date.parse(date))) {
+                    skipped++;
+                    errors.push(`Row ${i + 1}: Invalid date "${date}"`);
+                    continue;
+                }
+
+                // Normalize date to YYYY-MM-DD
+                const parsedDate = new Date(date);
+                const isoDate = parsedDate.toISOString().split('T')[0];
+
+                // Validate amount
+                if (isNaN(amount) || amount <= 0) {
+                    // If amount is negative, treat as expense with positive value
+                    if (!isNaN(amount) && amount < 0) {
+                        type = 'expense';
+                    } else {
+                        skipped++;
+                        errors.push(`Row ${i + 1}: Invalid amount`);
+                        continue;
+                    }
+                }
+
+                // Infer type from amount sign if not provided
+                if (!VALID_TYPES.includes(type)) {
+                    type = amount < 0 ? 'expense' : 'income';
+                }
+
+                // Normalize category
+                const matchedCategory = VALID_CATEGORIES.find(c => c.toLowerCase() === category.toLowerCase());
+                category = matchedCategory || 'Other';
+
+                const absAmount = Math.abs(amount);
+
+                runSql(
+                    'INSERT INTO transactions (user_id, type, amount, category, description, date) VALUES (?, ?, ?, ?, ?, ?)',
+                    [userId, type, absAmount, category, description, isoDate]
+                );
+                imported++;
+            } catch (rowErr) {
+                skipped++;
+                errors.push(`Row ${i + 1}: ${rowErr.message}`);
+            }
+        }
+
+        res.json({
+            message: `Imported ${imported} transaction${imported !== 1 ? 's' : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}`,
+            imported,
+            skipped,
+            errors: errors.slice(0, 10), // return first 10 errors max
+        });
+    } catch (err) {
+        console.error('Import CSV error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Simple CSV line parser that handles quoted fields
+function parseCsvLine(line) {
+    const fields = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                if (i + 1 < line.length && line[i + 1] === '"') {
+                    current += '"';
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+            } else {
+                current += ch;
+            }
+        } else {
+            if (ch === '"') {
+                inQuotes = true;
+            } else if (ch === ',') {
+                fields.push(current);
+                current = '';
+            } else {
+                current += ch;
+            }
+        }
+    }
+    fields.push(current);
+    return fields;
+}
+
 // POST /api/transactions
 router.post('/', requireAuth, [
     body('type').isIn(VALID_TYPES).withMessage('Type must be income or expense'),

@@ -2,20 +2,32 @@ const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, '..', '..', 'moneytrack.db');
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// In production, use /tmp (writable on most platforms like Render, Railway, Heroku)
+// In development, use the project root
+const DB_PATH = IS_PRODUCTION
+    ? path.join('/tmp', 'moneytrack.db')
+    : path.join(__dirname, '..', '..', 'moneytrack.db');
+
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 let db = null;
 
 async function initDatabase() {
-    const SQL = await initSqlJs();
+    // Locate the sql.js WASM binary explicitly from node_modules
+    const SQL = await initSqlJs({
+        locateFile: file => path.join(__dirname, '..', '..', 'node_modules', 'sql.js', 'dist', file)
+    });
 
     // Load existing database or create new one
     if (fs.existsSync(DB_PATH)) {
         const buffer = fs.readFileSync(DB_PATH);
         db = new SQL.Database(buffer);
+        console.log(`📂 Loaded existing database from ${DB_PATH}`);
     } else {
         db = new SQL.Database();
+        console.log('🆕 Created new in-memory database');
     }
 
     // Enable foreign keys
@@ -40,9 +52,15 @@ async function initDatabase() {
 
 function saveDatabase() {
     if (!db) return;
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
+    try {
+        const data = db.export();
+        const buffer = Buffer.from(data);
+        fs.writeFileSync(DB_PATH, buffer);
+    } catch (err) {
+        console.error('⚠️ Could not save database to disk:', err.message);
+        // In production on read-only filesystems, this is expected
+        // The database will still work in-memory
+    }
 }
 
 function getDb() {

@@ -4,12 +4,9 @@
 
 (function () {
     // ---- State ----
-    let currentPage = 1;
-    const pageLimit = 10;
-    let sortOrder = 'desc';
     let categoryChart = null;
-    let monthlyChart = null;
-    let searchTimeout = null;
+    let spendingChart = null;
+    let timeRange = 'monthly'; // monthly | quarterly | yearly
 
     // ---- DOM References ----
     const $ = (sel) => document.querySelector(sel);
@@ -22,32 +19,9 @@
     const totalIncome = $('#total-income');
     const totalExpenses = $('#total-expenses');
     const currentBalance = $('#current-balance');
-    const savingsRateEl = $('#savings-rate');
-    const transactionsBody = $('#transactions-body');
-    const paginationEl = $('#pagination');
-    const filterCategory = $('#filter-category');
-    const filterType = $('#filter-type');
-    const searchInput = $('#search-input');
-    const dateFrom = $('#date-from');
-    const dateTo = $('#date-to');
-    const sortDateBtn = $('#sort-date');
-    const addTransactionBtn = $('#add-transaction-btn');
-    const exportCsvBtn = $('#export-csv-btn');
-    const monthPicker = $('#month-picker');
-    const modalOverlay = $('#transaction-modal');
-    const modalTitle = $('#modal-title');
-    const modalClose = $('#modal-close');
-    const modalCancel = $('#modal-cancel');
-    const modalSubmit = $('#modal-submit');
-    const modalError = $('#modal-error');
-    const transactionForm = $('#transaction-form');
-    const editId = $('#edit-id');
-    const txnType = $('#txn-type');
-    const txnAmount = $('#txn-amount');
-    const txnCategory = $('#txn-category');
-    const txnDate = $('#txn-date');
-    const txnDescription = $('#txn-description');
-    const insightsGrid = $('#insights-grid');
+    const balanceChange = $('#balance-change');
+    const incomeChange = $('#income-change');
+    const expenseChange = $('#expense-change');
 
     // ---- Sidebar ----
     const sidebar = $('#sidebar');
@@ -63,7 +37,18 @@
 
     // ---- Helpers ----
     function formatCurrency(amount) {
-        return '₹' + Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        const num = Number(amount);
+        if (num >= 100000) {
+            return '₹' + (num / 100000).toFixed(2) + 'L';
+        }
+        if (num >= 1000) {
+            return '₹' + (num / 1000).toFixed(num >= 10000 ? 1 : 2) + 'k';
+        }
+        return '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function formatCurrencyFull(amount) {
+        return '₹' + Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function formatDate(dateStr) {
@@ -76,14 +61,16 @@
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
 
-    function getSelectedMonth() {
-        return monthPicker && monthPicker.value ? monthPicker.value : getCurrentMonth();
-    }
-
     function getMonthLabel(monthStr) {
         const [year, month] = monthStr.split('-');
         const date = new Date(year, month - 1);
-        return date.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        return date.toLocaleDateString('en-IN', { month: 'short' });
+    }
+
+    function getMonthsForRange() {
+        if (timeRange === 'quarterly') return 3;
+        if (timeRange === 'yearly') return 12;
+        return 1;
     }
 
     const categoryEmojis = {
@@ -113,6 +100,18 @@
             const data = await res.json();
             if (userEmail) userEmail.textContent = data.user.email;
             if (userAvatar) userAvatar.textContent = data.user.email.charAt(0).toUpperCase();
+
+            // Update greeting
+            const greetingEl = $('#greeting-text');
+            if (greetingEl) {
+                const hour = new Date().getHours();
+                let greet = 'Good evening';
+                if (hour < 12) greet = 'Good morning';
+                else if (hour < 17) greet = 'Good afternoon';
+                const name = data.user.email.split('@')[0];
+                greetingEl.textContent = `${greet}, ${name}! Your finances are looking solid today.`;
+            }
+
             return true;
         } catch {
             window.location.href = '/';
@@ -125,71 +124,235 @@
         try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { window.location.href = '/'; }
     });
 
-    // ---- Month Picker ----
-    if (monthPicker) {
-        monthPicker.value = getCurrentMonth();
-        monthPicker.addEventListener('change', () => refreshAll());
+    // ---- Time Filter Tabs ----
+    const timeFilterTabs = $('#time-filter-tabs');
+    if (timeFilterTabs) {
+        timeFilterTabs.addEventListener('click', (e) => {
+            const tab = e.target.closest('.time-tab');
+            if (!tab) return;
+            $$('.time-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            timeRange = tab.dataset.range;
+            refreshAll();
+        });
+    }
+
+    // ---- Sparkline Drawing ----
+    function drawSparkline(canvasId, data, color) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !data.length) return;
+
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        const padding = 4;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const max = Math.max(...data, 1);
+        const min = Math.min(...data, 0);
+        const range = max - min || 1;
+
+        const points = data.map((v, i) => ({
+            x: padding + (i / (data.length - 1 || 1)) * (w - padding * 2),
+            y: h - padding - ((v - min) / range) * (h - padding * 2),
+        }));
+
+        // Gradient fill
+        const gradient = ctx.createLinearGradient(0, 0, 0, h);
+        gradient.addColorStop(0, color + '40');
+        gradient.addColorStop(1, color + '00');
+
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, h);
+        points.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.lineTo(points[points.length - 1].x, h);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Line
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            const cx = (points[i - 1].x + points[i].x) / 2;
+            ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, cx, (points[i - 1].y + points[i].y) / 2);
+        }
+        ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // End dot
+        const last = points[points.length - 1];
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
     }
 
     // ---- Dashboard Summary ----
     async function loadSummary() {
         try {
-            const month = getSelectedMonth();
+            const month = getCurrentMonth();
             const res = await fetch(`/api/dashboard/summary?month=${month}`);
             const data = await res.json();
 
-            totalIncome.textContent = formatCurrency(data.totalIncome);
-            totalExpenses.textContent = formatCurrency(data.totalExpenses);
-            currentBalance.textContent = formatCurrency(data.balance);
+            totalIncome.textContent = formatCurrencyFull(data.totalIncome);
+            totalExpenses.textContent = formatCurrencyFull(data.totalExpenses);
+            currentBalance.textContent = formatCurrencyFull(data.balance);
             currentBalance.style.color = data.balance >= 0 ? 'var(--accent-blue)' : 'var(--accent-red)';
-
-            // Starting balance
-            const startingBalEl = $('#starting-balance');
-            if (startingBalEl) startingBalEl.textContent = formatCurrency(data.startingBalance || 0);
-
-            // Savings rate
-            const rate = data.totalIncome > 0 ? Math.round(((data.totalIncome - data.totalExpenses) / data.totalIncome) * 100) : 0;
-            if (savingsRateEl) {
-                savingsRateEl.textContent = rate + '%';
-                savingsRateEl.style.color = rate >= 20 ? 'var(--accent-green)' : rate >= 0 ? 'var(--accent-amber)' : 'var(--accent-red)';
-            }
         } catch (err) {
             console.error('Failed to load summary:', err);
         }
     }
 
-    // ---- Insights ----
-    async function loadInsights() {
+    // ---- Spending Over Time (Line Chart) ----
+    async function loadSpendingChart() {
         try {
-            const res = await fetch('/api/analytics/insights');
+            const months = timeRange === 'yearly' ? 12 : timeRange === 'quarterly' ? 3 : 6;
+            const res = await fetch(`/api/dashboard/monthly?months=${months}`);
             const data = await res.json();
 
-            if (insightsGrid && data.insights) {
-                insightsGrid.innerHTML = data.insights.map(i => `
-                    <div class="insight-card insight-${i.type}">
-                        <div class="insight-icon">${i.icon}</div>
-                        <div class="insight-body">
-                            <div class="insight-title">${i.title}</div>
-                            <div class="insight-text">${i.text}</div>
-                        </div>
-                    </div>
-                `).join('');
+            const labels = data.monthly.map(m => getMonthLabel(m.month));
+            const incomeData = data.monthly.map(m => m.income);
+            const expenseData = data.monthly.map(m => m.expense);
+
+            const ctx = document.getElementById('spending-chart').getContext('2d');
+
+            if (spendingChart) spendingChart.destroy();
+
+            if (labels.length === 0) {
+                ctx.font = '14px Inter';
+                ctx.fillStyle = '#5e5e6e';
+                ctx.textAlign = 'center';
+                ctx.fillText('No data yet', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                return;
             }
+
+            // Draw sparklines with monthly data
+            drawSparkline('sparkline-balance', data.monthly.map(m => m.income - m.expense), '#60a5fa');
+            drawSparkline('sparkline-income', incomeData, '#34d399');
+            drawSparkline('sparkline-expenses', expenseData, '#f87171');
+
+            // Calculate percentage changes for badges
+            if (data.monthly.length >= 2) {
+                const last = data.monthly[data.monthly.length - 1];
+                const prev = data.monthly[data.monthly.length - 2];
+
+                const incomePct = prev.income > 0 ? (((last.income - prev.income) / prev.income) * 100).toFixed(1) : '0.0';
+                const expensePct = prev.expense > 0 ? (((last.expense - prev.expense) / prev.expense) * 100).toFixed(1) : '0.0';
+                const balLast = last.income - last.expense;
+                const balPrev = prev.income - prev.expense;
+                const balPct = Math.abs(balPrev) > 0 ? (((balLast - balPrev) / Math.abs(balPrev)) * 100).toFixed(1) : '0.0';
+
+                if (incomeChange) {
+                    incomeChange.textContent = (incomePct >= 0 ? '+' : '') + incomePct + '%';
+                    incomeChange.className = 'card-change ' + (incomePct >= 0 ? 'positive' : 'negative');
+                }
+                if (expenseChange) {
+                    expenseChange.textContent = (expensePct >= 0 ? '+' : '') + expensePct + '%';
+                    expenseChange.className = 'card-change ' + (expensePct <= 0 ? 'positive' : 'negative');
+                }
+                if (balanceChange) {
+                    balanceChange.textContent = (balPct >= 0 ? '+' : '') + balPct + '%';
+                    balanceChange.className = 'card-change ' + (balPct >= 0 ? 'positive' : 'negative');
+                }
+            }
+
+            spendingChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Income',
+                            data: incomeData,
+                            borderColor: '#34d399',
+                            backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#34d399',
+                            pointBorderColor: '#12121a',
+                            pointBorderWidth: 2,
+                        },
+                        {
+                            label: 'Expenses',
+                            data: expenseData,
+                            borderColor: '#f87171',
+                            backgroundColor: 'rgba(248, 113, 113, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#f87171',
+                            pointBorderColor: '#12121a',
+                            pointBorderWidth: 2,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                            ticks: { color: '#5e5e6e', font: { family: 'Inter', size: 11 } },
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                            ticks: {
+                                color: '#5e5e6e',
+                                font: { family: 'Inter', size: 11 },
+                                callback: (v) => '₹' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v),
+                            },
+                            beginAtZero: true,
+                        },
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#9898a6',
+                                font: { family: 'Inter', size: 12 },
+                                usePointStyle: true,
+                                pointStyleWidth: 10,
+                                padding: 16,
+                            },
+                        },
+                        tooltip: {
+                            backgroundColor: '#1a1a2e',
+                            titleColor: '#f0f0f5',
+                            bodyColor: '#9898a6',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrencyFull(ctx.parsed.y)}`,
+                            },
+                        },
+                    },
+                },
+            });
         } catch (err) {
-            console.error('Failed to load insights:', err);
+            console.error('Failed to load spending chart:', err);
         }
     }
 
     // ---- Category Chart ----
     async function loadCategoryChart() {
         try {
-            const month = getSelectedMonth();
+            const month = getCurrentMonth();
             const res = await fetch(`/api/dashboard/categories?month=${month}`);
             const data = await res.json();
 
             const labels = data.categories.map(c => c.category);
             const values = data.categories.map(c => c.total);
             const colors = labels.map(l => categoryColors[l] || '#6b7280');
+            const total = values.reduce((a, b) => a + b, 0);
 
             const ctx = document.getElementById('category-chart').getContext('2d');
 
@@ -219,24 +382,23 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '65%',
+                    cutout: '70%',
                     plugins: {
                         legend: {
                             position: 'right',
                             labels: {
                                 color: '#9898a6',
                                 font: { family: 'Inter', size: 12 },
-                                padding: 12,
+                                padding: 14,
                                 usePointStyle: true,
                                 pointStyleWidth: 10,
-                                generateLabels: function(chart) {
+                                generateLabels: function (chart) {
                                     const data = chart.data;
                                     const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
                                     return data.labels.map((label, i) => {
                                         const value = data.datasets[0].data[i];
-                                        const pct = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                                         return {
-                                            text: `${categoryEmojis[label] || ''} ${label} (${pct}%)`,
+                                            text: `${categoryEmojis[label] || ''} ${label}  ₹${value.toLocaleString()}`,
                                             fillStyle: data.datasets[0].backgroundColor[i],
                                             strokeStyle: 'transparent',
                                             index: i,
@@ -256,238 +418,130 @@
                             padding: 12,
                             cornerRadius: 8,
                             callbacks: {
-                                label: (ctx) => ` ${formatCurrency(ctx.parsed)}`,
+                                label: (ctx) => ` ${formatCurrencyFull(ctx.parsed)}`,
                             },
                         },
                     },
                 },
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: function (chart) {
+                        const { width, height, ctx } = chart;
+                        ctx.restore();
+                        const fontSize = (height / 10).toFixed(2);
+                        ctx.font = `700 ${fontSize}px Inter`;
+                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = 'center';
+
+                        const centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
+                        const centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+
+                        ctx.fillStyle = '#f0f0f5';
+                        const totalText = '₹' + (total >= 1000 ? (total / 1000).toFixed(1) + 'k' : total.toFixed(0));
+                        ctx.fillText(totalText, centerX, centerY);
+                        ctx.save();
+                    },
+                }],
             });
         } catch (err) {
             console.error('Failed to load category chart:', err);
         }
     }
 
-    // ---- Monthly Chart ----
-    async function loadMonthlyChart() {
+    // ---- Recent Transactions ----
+    async function loadRecentTransactions() {
         try {
-            const res = await fetch('/api/dashboard/monthly?months=6');
+            const res = await fetch('/api/transactions?page=1&limit=5&sort=desc');
             const data = await res.json();
+            const container = $('#recent-transactions');
+            if (!container) return;
 
-            const labels = data.monthly.map(m => getMonthLabel(m.month));
-            const incomeData = data.monthly.map(m => m.income);
-            const expenseData = data.monthly.map(m => m.expense);
-
-            const ctx = document.getElementById('monthly-chart').getContext('2d');
-
-            if (monthlyChart) monthlyChart.destroy();
-
-            if (labels.length === 0) {
-                ctx.font = '14px Inter';
-                ctx.fillStyle = '#5e5e6e';
-                ctx.textAlign = 'center';
-                ctx.fillText('No data yet', ctx.canvas.width / 2, ctx.canvas.height / 2);
+            if (!data.transactions.length) {
+                container.innerHTML = `
+                    <div class="empty-state" style="padding:2rem 1rem;">
+                        <div class="empty-icon">📭</div>
+                        <p>No transactions yet</p>
+                    </div>`;
                 return;
             }
 
-            monthlyChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels,
-                    datasets: [
-                        {
-                            label: 'Income',
-                            data: incomeData,
-                            backgroundColor: 'rgba(52, 211, 153, 0.7)',
-                            borderColor: '#34d399',
-                            borderWidth: 1,
-                            borderRadius: 6,
-                            borderSkipped: false,
-                        },
-                        {
-                            label: 'Expense',
-                            data: expenseData,
-                            backgroundColor: 'rgba(248, 113, 113, 0.7)',
-                            borderColor: '#f87171',
-                            borderWidth: 1,
-                            borderRadius: 6,
-                            borderSkipped: false,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255,255,255,0.04)' },
-                            ticks: { color: '#9898a6', font: { family: 'Inter', size: 11 } },
-                        },
-                        y: {
-                            grid: { color: 'rgba(255,255,255,0.04)' },
-                            ticks: {
-                                color: '#9898a6',
-                                font: { family: 'Inter', size: 11 },
-                                callback: (v) => '₹' + (v / 1000).toFixed(0) + 'k',
-                            },
-                            beginAtZero: true,
-                        },
-                    },
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: '#9898a6',
-                                font: { family: 'Inter', size: 12 },
-                                usePointStyle: true,
-                                pointStyleWidth: 10,
-                                padding: 16,
-                            },
-                        },
-                        tooltip: {
-                            backgroundColor: '#1a1a2e',
-                            titleColor: '#f0f0f5',
-                            bodyColor: '#9898a6',
-                            borderColor: 'rgba(255,255,255,0.1)',
-                            borderWidth: 1,
-                            padding: 12,
-                            cornerRadius: 8,
-                            callbacks: {
-                                label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
-                            },
-                        },
-                    },
-                },
-            });
-        } catch (err) {
-            console.error('Failed to load monthly chart:', err);
-        }
-    }
-
-    // ---- Transactions ----
-    async function loadTransactions() {
-        try {
-            const category = filterCategory.value;
-            const type = filterType.value;
-            const search = searchInput ? searchInput.value : '';
-            const dfrom = dateFrom ? dateFrom.value : '';
-            const dto = dateTo ? dateTo.value : '';
-            let url = `/api/transactions?page=${currentPage}&limit=${pageLimit}&sort=${sortOrder}`;
-            if (category) url += `&category=${encodeURIComponent(category)}`;
-            if (type) url += `&type=${encodeURIComponent(type)}`;
-            if (search) url += `&search=${encodeURIComponent(search)}`;
-            if (dfrom) url += `&dateFrom=${dfrom}`;
-            if (dto) url += `&dateTo=${dto}`;
-
-            const res = await fetch(url);
-            const data = await res.json();
-
-            renderTransactions(data.transactions);
-            renderPagination(data.pagination);
-        } catch (err) {
-            console.error('Failed to load transactions:', err);
-        }
-    }
-
-    function renderTransactions(transactions) {
-        if (!transactions.length) {
-            transactionsBody.innerHTML = `
-                <tr>
-                    <td colspan="6">
-                        <div class="empty-state">
-                            <div class="empty-icon">📭</div>
-                            <p>No transactions found. Click "+ Add Transaction" to get started!</p>
-                        </div>
-                    </td>
-                </tr>`;
-            return;
-        }
-
-        transactionsBody.innerHTML = transactions.map(t => `
-            <tr data-id="${t.id}">
-                <td>${formatDate(t.date)}</td>
-                <td><span class="type-badge ${t.type}">${t.type}</span></td>
-                <td><span class="category-tag">${categoryEmojis[t.category] || ''} ${t.category}</span></td>
-                <td><span class="amount ${t.type}">${t.type === 'expense' ? '-' : '+'}${formatCurrency(t.amount)}</span></td>
-                <td><span class="description-text" title="${t.description || ''}">${t.description || '—'}</span></td>
-                <td>
-                    <div class="actions">
-                        <button class="btn-icon edit-btn" title="Edit" data-id="${t.id}">✏️</button>
-                        <button class="btn-icon delete-btn" title="Delete" data-id="${t.id}">🗑️</button>
+            container.innerHTML = data.transactions.map(t => `
+                <div class="recent-txn-item">
+                    <div class="recent-txn-icon ${t.type}">
+                        ${categoryEmojis[t.category] || '📦'}
                     </div>
-                </td>
-            </tr>
-        `).join('');
-
-        transactionsBody.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.addEventListener('click', () => openEditModal(transactions.find(t => t.id == btn.dataset.id)));
-        });
-
-        transactionsBody.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', () => deleteTransaction(btn.dataset.id));
-        });
+                    <div class="recent-txn-info">
+                        <span class="recent-txn-merchant">${t.description || t.category}</span>
+                        <span class="recent-txn-category">${t.category}</span>
+                    </div>
+                    <div class="recent-txn-details">
+                        <span class="recent-txn-date">${formatDate(t.date)}</span>
+                        <span class="recent-txn-amount ${t.type}">${t.type === 'expense' ? '-' : '+'}${formatCurrencyFull(t.amount)}</span>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) {
+            console.error('Failed to load recent transactions:', err);
+        }
     }
 
-    function renderPagination(pg) {
-        if (pg.totalPages <= 1) {
-            paginationEl.innerHTML = `<span class="page-info">${pg.total} transaction${pg.total !== 1 ? 's' : ''}</span>`;
-            return;
-        }
+    // ---- Budget Status ----
+    async function loadBudgetStatus() {
+        try {
+            const month = getCurrentMonth();
+            const res = await fetch(`/api/budgets?month=${month}`);
+            const data = await res.json();
+            const container = $('#budget-status');
+            if (!container) return;
 
-        let html = '';
-        html += `<button ${pg.page <= 1 ? 'disabled' : ''} data-page="${pg.page - 1}">‹ Prev</button>`;
-
-        for (let i = 1; i <= pg.totalPages; i++) {
-            if (pg.totalPages > 7) {
-                if (i === 1 || i === pg.totalPages || (i >= pg.page - 1 && i <= pg.page + 1)) {
-                    html += `<button class="${i === pg.page ? 'active' : ''}" data-page="${i}">${i}</button>`;
-                } else if (i === pg.page - 2 || i === pg.page + 2) {
-                    html += `<span class="page-info">...</span>`;
-                }
-            } else {
-                html += `<button class="${i === pg.page ? 'active' : ''}" data-page="${i}">${i}</button>`;
+            if (!data.budgets.length) {
+                container.innerHTML = `
+                    <div class="empty-state" style="padding:2rem 1rem;">
+                        <div class="empty-icon">📋</div>
+                        <p>No budgets set. <a href="/budget.html">Create one</a></p>
+                    </div>`;
+                return;
             }
+
+            container.innerHTML = data.budgets.slice(0, 4).map(b => {
+                const pct = Math.min(100, b.percentage);
+                let color = 'var(--accent-green)';
+                if (pct > 80) color = 'var(--accent-red)';
+                else if (pct > 60) color = 'var(--accent-amber)';
+
+                return `
+                    <div class="budget-status-item">
+                        <div class="budget-status-header">
+                            <span class="budget-status-label">${categoryEmojis[b.category] || ''} ${b.category}</span>
+                            <span class="budget-status-amounts">${formatCurrency(b.spent)} / ${formatCurrency(b.amount)}</span>
+                        </div>
+                        <div class="budget-progress-bar">
+                            <div class="budget-progress-fill" style="width:${pct}%;background:${color};"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            console.error('Failed to load budget status:', err);
         }
-
-        html += `<button ${pg.page >= pg.totalPages ? 'disabled' : ''} data-page="${pg.page + 1}">Next ›</button>`;
-        html += `<span class="page-info">${pg.total} total</span>`;
-
-        paginationEl.innerHTML = html;
-
-        paginationEl.querySelectorAll('button[data-page]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                currentPage = parseInt(btn.dataset.page);
-                loadTransactions();
-            });
-        });
     }
 
-    // ---- Filters & Sorting ----
-    filterCategory.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
-    filterType.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
+    // ---- Quick Add Transaction Modal ----
+    const modalOverlay = $('#transaction-modal');
+    const modalTitle = $('#modal-title');
+    const modalClose = $('#modal-close');
+    const modalCancel = $('#modal-cancel');
+    const modalSubmit = $('#modal-submit');
+    const modalError = $('#modal-error');
+    const transactionForm = $('#transaction-form');
+    const editId = $('#edit-id');
+    const txnType = $('#txn-type');
+    const txnAmount = $('#txn-amount');
+    const txnCategory = $('#txn-category');
+    const txnDate = $('#txn-date');
+    const txnDescription = $('#txn-description');
+    const addTransactionBtn = $('#add-transaction-btn');
 
-    if (searchInput) {
-        searchInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => { currentPage = 1; loadTransactions(); }, 300);
-        });
-    }
-
-    if (dateFrom) dateFrom.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
-    if (dateTo) dateTo.addEventListener('change', () => { currentPage = 1; loadTransactions(); });
-
-    sortDateBtn.addEventListener('click', () => {
-        sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
-        sortDateBtn.textContent = sortOrder === 'desc' ? 'Date ↓' : 'Date ↑';
-        loadTransactions();
-    });
-
-    // ---- CSV Export ----
-    if (exportCsvBtn) {
-        exportCsvBtn.addEventListener('click', () => {
-            window.location.href = '/api/transactions/export/csv';
-        });
-    }
-
-    // ---- Modal ----
     function openAddModal() {
         editId.value = '';
         transactionForm.reset();
@@ -498,38 +552,18 @@
         modalOverlay.classList.add('active');
     }
 
-    function openEditModal(txn) {
-        editId.value = txn.id;
-        txnType.value = txn.type;
-        txnAmount.value = txn.amount;
-        txnCategory.value = txn.category;
-        txnDate.value = txn.date;
-        txnDescription.value = txn.description || '';
-        modalTitle.textContent = 'Edit Transaction';
-        modalSubmit.textContent = 'Save Changes';
-        modalError.classList.remove('visible');
-        modalOverlay.classList.add('active');
-    }
-
     function closeModal() {
         modalOverlay.classList.remove('active');
     }
 
-    addTransactionBtn.addEventListener('click', openAddModal);
+    if (addTransactionBtn) addTransactionBtn.addEventListener('click', openAddModal);
     modalClose.addEventListener('click', closeModal);
     modalCancel.addEventListener('click', closeModal);
-
-    modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) closeModal();
-    });
-
+    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modalOverlay.classList.contains('active')) {
-            closeModal();
-        }
+        if (e.key === 'Escape' && modalOverlay.classList.contains('active')) closeModal();
     });
 
-    // ---- Submit Transaction ----
     transactionForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         modalError.classList.remove('visible');
@@ -548,73 +582,38 @@
             return;
         }
 
-        const isEdit = !!editId.value;
-        const url = isEdit ? `/api/transactions/${editId.value}` : '/api/transactions';
-        const method = isEdit ? 'PUT' : 'POST';
-
         try {
             modalSubmit.disabled = true;
-            modalSubmit.textContent = isEdit ? 'Saving...' : 'Adding...';
+            modalSubmit.textContent = 'Adding...';
 
-            const res = await fetch(url, {
-                method,
+            const res = await fetch('/api/transactions', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
 
             const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || 'Failed to save transaction');
-            }
+            if (!res.ok) throw new Error(data.error || 'Failed to add transaction');
 
             closeModal();
-            showToast(isEdit ? 'Transaction updated!' : 'Transaction added!', 'success');
+            showToast('Transaction added!', 'success');
             refreshAll();
         } catch (err) {
             modalError.textContent = err.message;
             modalError.classList.add('visible');
         } finally {
             modalSubmit.disabled = false;
-            modalSubmit.textContent = isEdit ? 'Save Changes' : 'Add Transaction';
+            modalSubmit.textContent = 'Add Transaction';
         }
     });
-
-    // ---- Delete Transaction ----
-    async function deleteTransaction(id) {
-        if (!confirm('Are you sure you want to delete this transaction?')) return;
-
-        try {
-            const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || 'Delete failed');
-            }
-
-            showToast('Transaction deleted', 'success');
-            refreshAll();
-        } catch (err) {
-            showToast(err.message, 'error');
-        }
-    }
 
     // ---- Starting Balance Modal ----
     const balanceModal = $('#balance-modal');
     const balanceForm = $('#balance-form');
-    const editBalanceBtn = $('#edit-balance-btn');
     const balanceModalClose = $('#balance-modal-close');
     const balanceModalCancel = $('#balance-modal-cancel');
-    const startingBalanceCard = $('#starting-balance-card');
 
-    function openBalanceModal() {
-        balanceModal.classList.add('active');
-    }
-    function closeBalanceModal() {
-        balanceModal.classList.remove('active');
-    }
-
-    if (editBalanceBtn) editBalanceBtn.addEventListener('click', (e) => { e.stopPropagation(); openBalanceModal(); });
-    if (startingBalanceCard) startingBalanceCard.addEventListener('click', openBalanceModal);
+    function closeBalanceModal() { balanceModal.classList.remove('active'); }
     if (balanceModalClose) balanceModalClose.addEventListener('click', closeBalanceModal);
     if (balanceModalCancel) balanceModalCancel.addEventListener('click', closeBalanceModal);
 
@@ -642,10 +641,10 @@
     async function refreshAll() {
         await Promise.all([
             loadSummary(),
+            loadSpendingChart(),
             loadCategoryChart(),
-            loadMonthlyChart(),
-            loadTransactions(),
-            loadInsights(),
+            loadRecentTransactions(),
+            loadBudgetStatus(),
         ]);
     }
 

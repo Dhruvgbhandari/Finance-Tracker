@@ -7,6 +7,12 @@ const { initDatabase } = require('./db/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Trust first proxy (required for Render, Heroku, Railway, etc.)
+if (IS_PRODUCTION) {
+    app.set('trust proxy', 1);
+}
 
 // Security headers
 app.use(helmet({
@@ -31,11 +37,11 @@ app.use(session({
     store: new MemoryStore({
         checkPeriod: 86400000, // prune expired entries every 24h
     }),
-    secret: 'moneytrack-secret-key-change-in-production',
+    secret: process.env.SESSION_SECRET || 'moneytrack-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: false,
+        secure: IS_PRODUCTION,       // true in production (HTTPS), false in dev
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         sameSite: 'lax',
@@ -44,6 +50,11 @@ app.use(session({
 
 // Static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Health check endpoint (required by deployment platforms)
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -73,8 +84,9 @@ async function start() {
         await initDatabase();
         console.log('✅ Database initialized');
 
-        app.listen(PORT, () => {
+        app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 MoneyTrack running at http://localhost:${PORT}`);
+            console.log(`   Environment: ${IS_PRODUCTION ? 'production' : 'development'}`);
         });
     } catch (err) {
         console.error('❌ Failed to start:', err);
