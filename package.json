@@ -11,16 +11,23 @@
     "dev": "node --watch src/server.js",
     "seed": "node src/db/seed.js"
   },
-  "keywords": ["finance", "tracker", "personal"],
+  "keywords": [
+    "finance",
+    "tracker",
+    "personal"
+  ],
   "author": "Dhruv",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "connect-mongo": "^6.0.0",
+    "dotenv": "^17.3.1",
     "express": "^4.21.1",
     "express-session": "^1.18.1",
     "express-validator": "^7.2.1",
     "helmet": "^8.0.0",
     "memorystore": "^1.6.7",
+    "mongoose": "^9.2.3",
     "sql.js": "^1.11.0"
   }
 }

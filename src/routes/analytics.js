@@ -1,53 +1,72 @@
 const express = require('express');
-const { queryAll, queryOne } = require('../db/database');
+const mongoose = require('mongoose');
+const { Transaction, User } = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 // GET /api/analytics/networth?months=12
-router.get('/networth', requireAuth, (req, res) => {
+router.get('/networth', requireAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
+        const userId = new mongoose.Types.ObjectId(req.session.userId);
         const months = Math.min(24, Math.max(1, parseInt(req.query.months) || 12));
 
         // Get starting balance
-        const user = queryOne('SELECT starting_balance FROM users WHERE id = ?', [userId]);
+        const user = await User.findById(userId).select('starting_balance');
         const startingBalance = user ? (user.starting_balance || 0) : 0;
 
+        // Calculate dates
+        const startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - months);
+        const startDateStr = startDate.toISOString().slice(0, 7);
+
         // Get monthly income and expense totals
-        const data = queryAll(`
-            SELECT
-                strftime('%Y-%m', date) as month,
-                type,
-                COALESCE(SUM(amount), 0) as total
-            FROM transactions
-            WHERE user_id = ?
-              AND date >= date('now', '-' || ? || ' months')
-            GROUP BY month, type
-            ORDER BY month ASC
-        `, [userId, months]);
+        const data = await Transaction.aggregate([
+            {
+                $match: {
+                    user_id: userId,
+                    date: { $gte: startDateStr }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        month: { $substr: ['$date', 0, 7] },
+                        type: '$type'
+                    },
+                    total: { $sum: '$amount' }
+                }
+            },
+            { $sort: { '_id.month': 1 } }
+        ]);
+
+        // Prior data for cumulative starting point
+        const priorResults = await Transaction.aggregate([
+            {
+                $match: {
+                    user_id: userId,
+                    date: { $lt: startDateStr }
+                }
+            },
+            {
+                $group: {
+                    _id: '$type',
+                    total: { $sum: '$amount' }
+                }
+            }
+        ]);
+
+        let cumulative = startingBalance;
+        const priorIncome = priorResults.find(r => r._id === 'income')?.total || 0;
+        const priorExpense = priorResults.find(r => r._id === 'expense')?.total || 0;
+        cumulative += (priorIncome - priorExpense);
 
         // Build cumulative net worth
         const monthMap = {};
         for (const row of data) {
-            if (!monthMap[row.month]) {
-                monthMap[row.month] = { income: 0, expense: 0 };
-            }
-            monthMap[row.month][row.type] = row.total;
-        }
-
-        let cumulative = startingBalance;
-        // Also need historical data before the window to get the correct starting point
-        const priorData = queryOne(`
-            SELECT
-                COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END), 0) as income,
-                COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END), 0) as expense
-            FROM transactions
-            WHERE user_id = ? AND date < date('now', '-' || ? || ' months')
-        `, [userId, months]);
-
-        if (priorData) {
-            cumulative += priorData.income - priorData.expense;
+            const m = row._id.month;
+            if (!monthMap[m]) monthMap[m] = { income: 0, expense: 0 };
+            monthMap[m][row._id.type] = row.total;
         }
 
         const sortedMonths = Object.keys(monthMap).sort();
@@ -64,18 +83,34 @@ router.get('/networth', requireAuth, (req, res) => {
 });
 
 // GET /api/analytics/heatmap?year=YYYY
-router.get('/heatmap', requireAuth, (req, res) => {
+router.get('/heatmap', requireAuth, async (req, res) => {
     try {
         const userId = req.session.userId;
         const year = req.query.year || new Date().getFullYear().toString();
 
-        const data = queryAll(`
-            SELECT date, COALESCE(SUM(amount), 0) as total
-            FROM transactions
-            WHERE user_id = ? AND type = 'expense' AND strftime('%Y', date) = ?
-            GROUP BY date
-            ORDER BY date ASC
-        `, [userId, year]);
+        const data = await Transaction.aggregate([
+            {
+                $match: {
+                    user_id: userId,
+                    type: 'expense',
+                    date: { $regex: `^${year}` }
+                }
+            },
+            {
+                $group: {
+                    _id: '$date',
+                    total: { $sum: '$amount' }
+                }
+            },
+            { $sort: { _id: 1 } },
+            {
+                $project: {
+                    _id: 0,
+                    date: '$_id',
+                    total: 1
+                }
+            }
+        ]);
 
         res.json({ heatmap: data, year });
     } catch (err) {
@@ -85,59 +120,71 @@ router.get('/heatmap', requireAuth, (req, res) => {
 });
 
 // GET /api/analytics/insights
-router.get('/insights', requireAuth, (req, res) => {
+router.get('/insights', requireAuth, async (req, res) => {
     try {
         const userId = req.session.userId;
         const now = new Date();
-        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonth = now.toISOString().slice(0, 7);
 
         // Previous month
         const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+        const prevMonth = prevDate.toISOString().slice(0, 7);
 
-        // Current month totals
-        const currentIncome = queryOne(`
-            SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-            WHERE user_id = ? AND type = 'income' AND strftime('%Y-%m', date) = ?
-        `, [userId, currentMonth]);
+        // Aggregation for stats
+        const statsData = await Transaction.aggregate([
+            {
+                $match: {
+                    user_id: userId,
+                    date: { $regex: `^(${currentMonth}|${prevMonth})` }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        month: { $substr: ['$date', 0, 7] },
+                        type: '$type'
+                    },
+                    total: { $sum: '$amount' },
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
 
-        const currentExpense = queryOne(`
-            SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-            WHERE user_id = ? AND type = 'expense' AND strftime('%Y-%m', date) = ?
-        `, [userId, currentMonth]);
-
-        // Previous month totals
-        const prevIncome = queryOne(`
-            SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-            WHERE user_id = ? AND type = 'income' AND strftime('%Y-%m', date) = ?
-        `, [userId, prevMonth]);
-
-        const prevExpense = queryOne(`
-            SELECT COALESCE(SUM(amount), 0) as total FROM transactions
-            WHERE user_id = ? AND type = 'expense' AND strftime('%Y-%m', date) = ?
-        `, [userId, prevMonth]);
+        const findStat = (m, t) => statsData.find(s => s._id.month === m && s._id.type === t)?.total || 0;
+        const currentIncome = findStat(currentMonth, 'income');
+        const currentExpense = findStat(currentMonth, 'expense');
+        const prevIncome = findStat(prevMonth, 'income');
+        const prevExpense = findStat(prevMonth, 'expense');
+        const txnCount = statsData.filter(s => s._id.month === currentMonth).reduce((acc, s) => acc + s.count, 0);
 
         // Top spending category this month
-        const topCategory = queryOne(`
-            SELECT category, COALESCE(SUM(amount), 0) as total FROM transactions
-            WHERE user_id = ? AND type = 'expense' AND strftime('%Y-%m', date) = ?
-            GROUP BY category ORDER BY total DESC LIMIT 1
-        `, [userId, currentMonth]);
+        const topCategoryData = await Transaction.aggregate([
+            {
+                $match: {
+                    user_id: userId,
+                    type: 'expense',
+                    date: { $regex: `^${currentMonth}` }
+                }
+            },
+            {
+                $group: {
+                    _id: '$category',
+                    total: { $sum: '$amount' }
+                }
+            },
+            { $sort: { total: -1 } },
+            { $limit: 1 }
+        ]);
+        const topCategory = topCategoryData.length > 0 ? topCategoryData[0] : null;
 
         // Savings rate
-        const income = currentIncome ? currentIncome.total : 0;
-        const expense = currentExpense ? currentExpense.total : 0;
+        const income = currentIncome;
+        const expense = currentExpense;
         const savingsRate = income > 0 ? Math.round(((income - expense) / income) * 100) : 0;
 
         // Month-over-month expense change
-        const prevExp = prevExpense ? prevExpense.total : 0;
+        const prevExp = prevExpense;
         const expenseChange = prevExp > 0 ? Math.round(((expense - prevExp) / prevExp) * 100) : 0;
-
-        // Transaction count this month
-        const txnCount = queryOne(`
-            SELECT COUNT(*) as count FROM transactions
-            WHERE user_id = ? AND strftime('%Y-%m', date) = ?
-        `, [userId, currentMonth]);
 
         // Average daily spending this month
         const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -176,7 +223,7 @@ router.get('/insights', requireAuth, (req, res) => {
                 type: categoryPct > 40 ? 'warning' : 'info',
                 icon: '📊',
                 title: 'Top Spending Category',
-                text: `${topCategory.category} takes up ₹${topCategory.total.toLocaleString()} (${categoryPct}% of income).`,
+                text: `${topCategory._id} takes up ₹${topCategory.total.toLocaleString()} (${categoryPct}% of income).`,
             });
         }
 
@@ -210,9 +257,9 @@ router.get('/insights', requireAuth, (req, res) => {
                 currentExpense: expense,
                 savingsRate,
                 expenseChange,
-                topCategory: topCategory ? topCategory.category : null,
+                topCategory: topCategory ? topCategory._id : null,
                 topCategoryAmount: topCategory ? topCategory.total : 0,
-                transactionCount: txnCount ? txnCount.count : 0,
+                transactionCount: txnCount,
                 avgDailySpending,
             },
         });

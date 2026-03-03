@@ -213,6 +213,7 @@
             const months = timeRange === 'yearly' ? 12 : timeRange === 'quarterly' ? 3 : 6;
             const res = await fetch(`/api/dashboard/monthly?months=${months}`);
             const data = await res.json();
+            if (!res.ok || !data.monthly) throw new Error(data.error || 'Failed to load spending data');
 
             const labels = data.monthly.map(m => getMonthLabel(m.month));
             const incomeData = data.monthly.map(m => m.income);
@@ -348,6 +349,7 @@
             const month = getCurrentMonth();
             const res = await fetch(`/api/dashboard/categories?month=${month}`);
             const data = await res.json();
+            if (!res.ok || !data.categories) throw new Error(data.error || 'Failed to load category data');
 
             const labels = data.categories.map(c => c.category);
             const values = data.categories.map(c => c.total);
@@ -453,6 +455,8 @@
         try {
             const res = await fetch('/api/transactions?page=1&limit=5&sort=desc');
             const data = await res.json();
+            if (!res.ok || !data.transactions) throw new Error(data.error || 'Failed to load transactions');
+            
             const container = $('#recent-transactions');
             if (!container) return;
 
@@ -491,6 +495,8 @@
             const month = getCurrentMonth();
             const res = await fetch(`/api/budgets?month=${month}`);
             const data = await res.json();
+            if (!res.ok || !data.budgets) throw new Error(data.error || 'Failed to load budget status');
+            
             const container = $('#budget-status');
             if (!container) return;
 

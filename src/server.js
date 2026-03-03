@@ -1,6 +1,7 @@
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const MemoryStore = require('memorystore')(session);
+const MongoStore = require('connect-mongo').default || require('connect-mongo');
 const helmet = require('helmet');
 const path = require('path');
 const { initDatabase } = require('./db/database');
@@ -8,6 +9,7 @@ const { initDatabase } = require('./db/database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/moneytrack';
 
 // Trust first proxy (required for Render, Heroku, Railway, etc.)
 if (IS_PRODUCTION) {
@@ -34,8 +36,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Session configuration
 app.use(session({
-    store: new MemoryStore({
-        checkPeriod: 86400000, // prune expired entries every 24h
+    store: MongoStore.create({
+        mongoUrl: MONGODB_URI,
+        collectionName: 'sessions',
+        ttl: 24 * 60 * 60, // 24 hours
     }),
     secret: process.env.SESSION_SECRET || 'moneytrack-secret-key-change-in-production',
     resave: false,
