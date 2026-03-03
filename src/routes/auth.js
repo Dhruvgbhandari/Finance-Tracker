@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
-const { queryOne, runSql } = require('../db/database');
+const { User } = require('../db/database');
 
 const router = express.Router();
 
@@ -19,20 +19,20 @@ router.post('/register', [
         const { email, password } = req.body;
 
         // Check if user already exists
-        const existing = queryOne('SELECT id FROM users WHERE email = ?', [email]);
+        const existing = await User.findOne({ email });
         if (existing) {
             return res.status(409).json({ error: 'Email already registered' });
         }
 
         // Hash password and create user
         const passwordHash = await bcrypt.hash(password, 10);
-        const result = runSql('INSERT INTO users (email, password_hash) VALUES (?, ?)', [email, passwordHash]);
+        const user = await User.create({ email, password_hash: passwordHash });
 
         // Auto-login after register
-        req.session.userId = result.lastInsertRowid;
+        req.session.userId = user._id;
         req.session.email = email;
 
-        res.status(201).json({ message: 'Account created successfully', user: { id: result.lastInsertRowid, email } });
+        res.status(201).json({ message: 'Account created successfully', user: { id: user._id, email } });
     } catch (err) {
         console.error('Register error:', err);
         res.status(500).json({ error: 'Server error' });
@@ -52,7 +52,7 @@ router.post('/login', [
 
         const { email, password } = req.body;
 
-        const user = queryOne('SELECT * FROM users WHERE email = ?', [email]);
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
@@ -62,10 +62,10 @@ router.post('/login', [
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        req.session.userId = user.id;
+        req.session.userId = user._id;
         req.session.email = user.email;
 
-        res.json({ message: 'Logged in successfully', user: { id: user.id, email: user.email } });
+        res.json({ message: 'Logged in successfully', user: { id: user._id, email: user.email } });
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ error: 'Server error' });
@@ -84,39 +84,57 @@ router.post('/logout', (req, res) => {
 });
 
 // GET /api/auth/me
-router.get('/me', (req, res) => {
-    if (!req.session || !req.session.userId) {
-        return res.status(401).json({ error: 'Not authenticated' });
+router.get('/me', async (req, res) => {
+    try {
+        if (!req.session || !req.session.userId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const user = await User.findById(req.session.userId).select('email starting_balance');
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ user: { id: user._id, email: user.email, startingBalance: user.starting_balance || 0 } });
+    } catch (err) {
+        console.error('Auth me error:', err);
+        res.status(500).json({ error: 'Server error' });
     }
-    const user = queryOne('SELECT id, email, starting_balance FROM users WHERE id = ?', [req.session.userId]);
-    res.json({ user: { id: user.id, email: user.email, startingBalance: user.starting_balance || 0 } });
 });
 
 // GET /api/auth/balance — get starting balance
-router.get('/balance', (req, res) => {
-    if (!req.session || !req.session.userId) {
-        return res.status(401).json({ error: 'Not authenticated' });
+router.get('/balance', async (req, res) => {
+    try {
+        if (!req.session || !req.session.userId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const user = await User.findById(req.session.userId).select('starting_balance');
+        res.json({ startingBalance: user ? (user.starting_balance || 0) : 0 });
+    } catch (err) {
+        console.error('Get balance error:', err);
+        res.status(500).json({ error: 'Server error' });
     }
-    const user = queryOne('SELECT starting_balance FROM users WHERE id = ?', [req.session.userId]);
-    res.json({ startingBalance: user ? (user.starting_balance || 0) : 0 });
 });
 
 // PUT /api/auth/balance — set starting balance
 router.put('/balance', [
     body('startingBalance').isFloat({ min: 0 }).withMessage('Starting balance must be a non-negative number'),
-], (req, res) => {
-    if (!req.session || !req.session.userId) {
-        return res.status(401).json({ error: 'Not authenticated' });
-    }
+], async (req, res) => {
+    try {
+        if (!req.session || !req.session.userId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ error: errors.array()[0].msg });
-    }
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: errors.array()[0].msg });
+        }
 
-    const { startingBalance } = req.body;
-    runSql('UPDATE users SET starting_balance = ? WHERE id = ?', [startingBalance, req.session.userId]);
-    res.json({ message: 'Starting balance updated', startingBalance });
+        const { startingBalance } = req.body;
+        await User.findByIdAndUpdate(req.session.userId, { starting_balance: startingBalance });
+        res.json({ message: 'Starting balance updated', startingBalance });
+    } catch (err) {
+        console.error('Update balance error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
 });
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { queryAll, queryOne, runSql } = require('../db/database');
+const { SavingsGoal } = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -8,16 +8,19 @@ const router = express.Router();
 const GOAL_ICONS = ['🎯', '🏠', '🚗', '✈️', '💻', '📱', '🎓', '💍', '🏖️', '💰', '🎮', '📸'];
 
 // GET /api/goals
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     try {
         const userId = req.session.userId;
-        const goals = queryAll(
-            'SELECT * FROM savings_goals WHERE user_id = ? ORDER BY created_at DESC',
-            [userId]
-        );
+        const goals = await SavingsGoal.find({ user_id: userId }).sort({ created_at: -1 });
 
         const result = goals.map(g => ({
-            ...g,
+            id: g._id,
+            name: g.name,
+            target_amount: g.target_amount,
+            current_amount: g.current_amount,
+            deadline: g.deadline,
+            icon: g.icon,
+            color: g.color,
             percentage: g.target_amount > 0 ? Math.min(100, Math.round((g.current_amount / g.target_amount) * 100)) : 0,
             remaining: Math.max(0, g.target_amount - g.current_amount),
             daysLeft: g.deadline ? Math.max(0, Math.ceil((new Date(g.deadline) - new Date()) / (1000 * 60 * 60 * 24))) : null,
@@ -37,7 +40,7 @@ router.post('/', requireAuth, [
     body('deadline').optional({ nullable: true }).isISO8601().withMessage('Invalid deadline date'),
     body('icon').optional().isIn(GOAL_ICONS),
     body('color').optional().matches(/^#[0-9a-fA-F]{6}$/).withMessage('Invalid color hex'),
-], (req, res) => {
+], async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -47,13 +50,16 @@ router.post('/', requireAuth, [
         const { name, target_amount, deadline, icon, color } = req.body;
         const userId = req.session.userId;
 
-        const result = runSql(
-            'INSERT INTO savings_goals (user_id, name, target_amount, deadline, icon, color) VALUES (?, ?, ?, ?, ?, ?)',
-            [userId, name, target_amount, deadline || null, icon || '🎯', color || '#60a5fa']
-        );
+        const goal = await SavingsGoal.create({
+            user_id: userId,
+            name,
+            target_amount,
+            deadline: deadline || null,
+            icon: icon || '🎯',
+            color: color || '#60a5fa'
+        });
 
-        const goal = queryOne('SELECT * FROM savings_goals WHERE id = ?', [result.lastInsertRowid]);
-        res.status(201).json({ message: 'Goal created', goal });
+        res.status(201).json({ message: 'Goal created', goal: { ...goal._doc, id: goal._id } });
     } catch (err) {
         console.error('Create goal error:', err);
         res.status(500).json({ error: 'Server error' });
@@ -68,7 +74,7 @@ router.put('/:id', requireAuth, [
     body('deadline').optional({ nullable: true }),
     body('icon').optional(),
     body('color').optional(),
-], (req, res) => {
+], async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -78,8 +84,8 @@ router.put('/:id', requireAuth, [
         const { id } = req.params;
         const userId = req.session.userId;
 
-        const existing = queryOne('SELECT * FROM savings_goals WHERE id = ? AND user_id = ?', [id, userId]);
-        if (!existing) {
+        let goal = await SavingsGoal.findOne({ _id: id, user_id: userId });
+        if (!goal) {
             return res.status(404).json({ error: 'Goal not found' });
         }
 
@@ -87,24 +93,19 @@ router.put('/:id', requireAuth, [
 
         // If contributing, just add to current_amount
         if (contribute) {
-            const newAmount = existing.current_amount + contribute;
-            runSql('UPDATE savings_goals SET current_amount = ? WHERE id = ?', [newAmount, id]);
+            goal.current_amount += contribute;
+            await goal.save();
         } else {
             // Update fields
-            runSql(
-                `UPDATE savings_goals SET
-                    name = COALESCE(?, name),
-                    target_amount = COALESCE(?, target_amount),
-                    deadline = COALESCE(?, deadline),
-                    icon = COALESCE(?, icon),
-                    color = COALESCE(?, color)
-                WHERE id = ? AND user_id = ?`,
-                [name || null, target_amount || null, deadline !== undefined ? deadline : null, icon || null, color || null, id, userId]
-            );
+            if (name !== undefined) goal.name = name;
+            if (target_amount !== undefined) goal.target_amount = target_amount;
+            if (deadline !== undefined) goal.deadline = deadline;
+            if (icon !== undefined) goal.icon = icon;
+            if (color !== undefined) goal.color = color;
+            await goal.save();
         }
 
-        const updated = queryOne('SELECT * FROM savings_goals WHERE id = ?', [id]);
-        res.json({ message: contribute ? 'Contribution added' : 'Goal updated', goal: updated });
+        res.json({ message: contribute ? 'Contribution added' : 'Goal updated', goal: { ...goal._doc, id: goal._id } });
     } catch (err) {
         console.error('Update goal error:', err);
         res.status(500).json({ error: 'Server error' });
@@ -112,17 +113,16 @@ router.put('/:id', requireAuth, [
 });
 
 // DELETE /api/goals/:id
-router.delete('/:id', requireAuth, (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.session.userId;
 
-        const existing = queryOne('SELECT * FROM savings_goals WHERE id = ? AND user_id = ?', [id, userId]);
-        if (!existing) {
+        const deleted = await SavingsGoal.findOneAndDelete({ _id: id, user_id: userId });
+        if (!deleted) {
             return res.status(404).json({ error: 'Goal not found' });
         }
 
-        runSql('DELETE FROM savings_goals WHERE id = ? AND user_id = ?', [id, userId]);
         res.json({ message: 'Goal deleted' });
     } catch (err) {
         console.error('Delete goal error:', err);
