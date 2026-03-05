@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { Transaction } = require('../db/database');
+const { Transaction, mongoose } = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,7 +11,7 @@ const VALID_TYPES = ['income', 'expense'];
 // GET /api/transactions
 router.get('/', requireAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
+        const userId = new mongoose.Types.ObjectId(req.session.userId);
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
         const skip = (page - 1) * limit;
@@ -45,14 +45,32 @@ router.get('/', requireAuth, async (req, res) => {
             if (dateTo) query.date.$lte = dateTo;
         }
 
-        // Get total count
-        const total = await Transaction.countDocuments(query);
+        // Get total count + aggregated totals in parallel
+        const [total, aggResult, transactions] = await Promise.all([
+            Transaction.countDocuments(query),
+            Transaction.aggregate([
+                { $match: query },
+                {
+                    $group: {
+                        _id: '$type',
+                        total: { $sum: '$amount' },
+                    },
+                },
+            ]),
+            Transaction.find(query)
+                .sort({ date: sortOrder, created_at: -1 })
+                .skip(skip)
+                .limit(limit),
+        ]);
 
-        // Get paginated results
-        const transactions = await Transaction.find(query)
-            .sort({ date: sortOrder, created_at: -1 })
-            .skip(skip)
-            .limit(limit);
+        // Build summary totals
+        let totalIncome = 0;
+        let totalExpense = 0;
+        for (const row of aggResult) {
+            if (row._id === 'income') totalIncome = row.total;
+            else if (row._id === 'expense') totalExpense = row.total;
+        }
+        const netBalance = totalIncome - totalExpense;
 
         res.json({
             transactions,
@@ -61,6 +79,11 @@ router.get('/', requireAuth, async (req, res) => {
                 limit,
                 total,
                 totalPages: Math.ceil(total / limit),
+            },
+            summary: {
+                totalIncome,
+                totalExpense,
+                netBalance,
             },
         });
     } catch (err) {

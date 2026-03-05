@@ -791,7 +791,76 @@ input[type="month"]:focus,
     background: var(--bg-secondary);
 }
 
+/* ---------- Balance Summary Strip ---------- */
+.balance-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    animation: fadeSlideUp 0.5s ease 0.35s both;
+}
+
+.balance-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem;
+    background: var(--bg-glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-normal);
+    box-shadow: var(--shadow-sm);
+}
+
+.balance-card:hover {
+    background: var(--bg-glass-strong);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-hover);
+}
+
+.income-card { border-left: 3px solid var(--accent-green); }
+.expense-card { border-left: 3px solid var(--accent-red); }
+.net-card     { border-left: 3px solid var(--accent-blue); }
+
+.balance-card-icon {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.balance-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.balance-card-label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.balance-card-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    transition: color var(--transition-fast);
+}
+
+.balance-card-value.income  { color: var(--accent-green); }
+.balance-card-value.expense { color: var(--accent-red); }
+
+@media (max-width: 600px) {
+    .balance-strip { grid-template-columns: 1fr; }
+}
+
 /* ---------- Transactions Table ---------- */
+
 .transactions-card {
     background: var(--glass-texture), var(--bg-glass);
     background-blend-mode: overlay;

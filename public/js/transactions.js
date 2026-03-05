@@ -41,6 +41,9 @@
     const txnDate = $('#txn-date');
     const txnDescription = $('#txn-description');
     const txnCountSubtitle = $('#txn-count-subtitle');
+    const stripIncome = $('#strip-income');
+    const stripExpense = $('#strip-expense');
+    const stripBalance = $('#strip-balance');
 
     // ---- Sidebar ----
     const sidebar = $('#sidebar');
@@ -122,6 +125,17 @@
             // Update subtitle
             if (txnCountSubtitle) {
                 txnCountSubtitle.textContent = `Reviewing ${data.pagination.total.toLocaleString()} transaction${data.pagination.total !== 1 ? 's' : ''}`;
+            }
+
+            // Update balance strip
+            if (data.summary) {
+                const { totalIncome, totalExpense, netBalance } = data.summary;
+                if (stripIncome) stripIncome.textContent = formatCurrency(totalIncome);
+                if (stripExpense) stripExpense.textContent = formatCurrency(totalExpense);
+                if (stripBalance) {
+                    stripBalance.textContent = (netBalance >= 0 ? '+' : '') + formatCurrency(Math.abs(netBalance));
+                    stripBalance.className = 'balance-card-value ' + (netBalance >= 0 ? 'income' : 'expense');
+                }
             }
         } catch (err) {
             console.error('Failed to load transactions:', err);
