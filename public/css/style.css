@@ -1700,13 +1700,20 @@ input[type="month"]:focus,
 }
 
 @media (max-width: 768px) {
+    /* Switch layout to vertical stacking on mobile */
+    .app-layout {
+        flex-direction: column;
+    }
+
     .sidebar {
         transform: translateX(-100%);
-        width: 280px;
+        width: 260px;
+        visibility: hidden;
     }
 
     .sidebar.open {
         transform: translateX(0);
+        visibility: visible;
         box-shadow: 0 0 60px rgba(0,0,0,0.5);
     }
 
@@ -1714,14 +1721,27 @@ input[type="month"]:focus,
         display: block;
     }
 
+    /* Show mobile header with hamburger */
     .mobile-header {
         display: flex;
+        width: 100%;
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
 
     .main-content {
         margin-left: 0;
         max-width: 100vw;
+        width: 100%;
         padding: 1rem;
+        padding-top: 1rem;
+        overflow-x: hidden;
+    }
+
+    /* Prevent horizontal scroll on body */
+    body {
+        overflow-x: hidden;
     }
 
     .page-header h1 {
@@ -2135,4 +2155,674 @@ input[type="month"]:focus,
 
 @media (max-width: 480px) {
     .summary-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ============================================
+   UPI PAGE STYLES
+   ============================================ */
+
+/* Info Banner */
+.upi-info-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: rgba(52, 211, 153, 0.08);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    animation: fadeSlideUp 0.4s ease both;
+}
+
+.upi-info-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.upi-info-banner p {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+/* UPI Form Card */
+.upi-form-card {
+    background: var(--glass-texture), var(--bg-glass);
+    background-blend-mode: overlay;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    animation: fadeSlideUp 0.5s ease 0.1s both;
+    box-shadow: var(--shadow-md);
+}
+
+.upi-form-header {
+    padding: 1.5rem 1.5rem 0;
+}
+
+.upi-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.upi-logo {
+    font-size: 2rem;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+    flex-shrink: 0;
+}
+
+.upi-logo-row h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.15rem;
+}
+
+.upi-logo-row p {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* UPI Form */
+.upi-form {
+    padding: 1.25rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.upi-amount-group {
+    text-align: center;
+    padding: 0.5rem 0 0.75rem;
+}
+
+.upi-amount-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.upi-amount-input-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    max-width: 280px;
+    margin: 0 auto;
+}
+
+.upi-currency-symbol {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.upi-amount-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    font-family: inherit;
+    text-align: center;
+    width: 200px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.25rem;
+    transition: border-color var(--transition-fast);
+}
+
+.upi-amount-input:focus {
+    border-bottom-color: var(--accent-green);
+}
+
+.upi-amount-input::placeholder {
+    color: var(--text-muted);
+    font-weight: 300;
+}
+
+/* Remove number input spinners */
+.upi-amount-input::-webkit-outer-spin-button,
+.upi-amount-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.upi-amount-input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.field-hint {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* UPI App Selector */
+.upi-app-selector {
+    padding-top: 0.25rem;
+}
+
+.upi-app-selector label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.upi-app-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.upi-app-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.upi-app-pill:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.upi-app-pill.active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+    font-weight: 600;
+}
+
+.upi-app-pill span {
+    font-size: 1rem;
+}
+
+/* UPI Pay Button */
+.btn-upi {
+    background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+    color: white;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 0.9rem 1.5rem;
+    border-radius: var(--radius-lg);
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+    margin-top: 0.5rem;
+}
+
+.btn-upi:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(139, 92, 246, 0.45);
+}
+
+.btn-upi:active {
+    transform: translateY(0);
+}
+
+.btn-upi:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.btn-upi-icon {
+    font-size: 1.1rem;
+}
+
+/* UPI Recent Section */
+.upi-recent-section {
+    background: var(--glass-texture), var(--bg-glass);
+    background-blend-mode: overlay;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-xl);
+    padding: 1.5rem;
+    animation: fadeSlideUp 0.5s ease 0.2s both;
+}
+
+.upi-recent-section h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.upi-recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.upi-recent-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.5rem;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast);
+}
+
+.upi-recent-item:hover {
+    background: var(--bg-card-hover);
+}
+
+.upi-recent-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: var(--accent-red-dim);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.upi-recent-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.upi-recent-desc {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upi-recent-date {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.upi-recent-amount {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-red);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* UPI Confirmation Modal */
+.upi-confirm-modal-inner {
+    text-align: center;
+    max-width: 380px;
+}
+
+.upi-confirm-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.upi-confirm-modal-inner h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.upi-confirm-desc {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
+}
+
+.upi-confirm-details {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    text-align: left;
+}
+
+.upi-confirm-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+}
+
+.upi-confirm-row + .upi-confirm-row {
+    border-top: 1px solid var(--border-color);
+}
+
+.upi-confirm-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.upi-confirm-value {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.upi-confirm-value.amount-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--accent-green);
+}
+
+.upi-id-small {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+/* ============================================
+   BOTTOM NAVIGATION BAR (Mobile Only)
+   ============================================ */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border-top: 1px solid var(--border-glass);
+    padding: 0.35rem 0.5rem;
+    padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+}
+
+.bottom-nav-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.4rem 0.5rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    flex: 1;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item:hover {
+    color: var(--text-secondary);
+}
+
+.bottom-nav-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+    transition: transform var(--transition-fast);
+}
+
+.bottom-nav-item.active {
+    color: var(--accent-green);
+}
+
+.bottom-nav-item.active .bottom-nav-icon {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.5));
+}
+
+/* ============================================
+   PWA INSTALL + UPDATE BANNERS
+   ============================================ */
+#pwa-install-banner {
+    position: fixed;
+    bottom: -100px;
+    left: 1rem;
+    right: 1rem;
+    z-index: 2000;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-xl);
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.4);
+    transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+#pwa-install-banner.visible {
+    bottom: 1.5rem;
+}
+
+.pwa-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.pwa-banner-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.pwa-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.pwa-banner-text strong {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+}
+
+.pwa-banner-text span {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pwa-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.pwa-install-btn {
+    padding: 0.45rem 1rem;
+    background: linear-gradient(135deg, var(--accent-green), #059669);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-full);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.pwa-install-btn:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-glow-green);
+}
+
+.pwa-dismiss-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.pwa-dismiss-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.pwa-update-banner {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-full);
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+    animation: fadeSlideUp 0.4s ease both;
+}
+
+.pwa-update-banner span {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.pwa-update-banner button {
+    padding: 0.3rem 0.75rem;
+    background: var(--accent-blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-full);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+}
+
+.pwa-update-banner button:hover {
+    opacity: 0.85;
+}
+
+/* ============================================
+   RESPONSIVE — BOTTOM NAV + MOBILE TWEAKS
+   ============================================ */
+/* Sidebar overlay backdrop */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 199;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    /* Show bottom nav bar */
+    .bottom-nav {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+    }
+
+    /* Extra padding so content isn't hidden behind bottom nav + mobile header */
+    .main-content {
+        padding-bottom: 5rem;
+    }
+
+    /* Minimum touch targets */
+    .btn, button, .nav-link, a.bottom-nav-item {
+        min-height: 44px;
+    }
+
+    /* Scrollable transactions table */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* UPI form responsiveness */
+    .upi-form .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .upi-app-pills {
+        justify-content: center;
+    }
+
+    /* Move PWA banner above bottom nav */
+    #pwa-install-banner.visible {
+        bottom: 5rem;
+    }
 }

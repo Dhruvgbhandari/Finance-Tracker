@@ -9,8 +9,12 @@
     const sidebar = $('#sidebar');
     const hamburgerBtn = $('#hamburger-btn');
     const sidebarClose = $('#sidebar-close');
-    if (hamburgerBtn) hamburgerBtn.addEventListener('click', () => sidebar.classList.add('open'));
-    if (sidebarClose) sidebarClose.addEventListener('click', () => sidebar.classList.remove('open'));
+    const sidebarOverlay = $('#sidebar-overlay');
+    function openSidebar() { sidebar.classList.add('open'); if (sidebarOverlay) sidebarOverlay.classList.add('active'); }
+    function closeSidebar() { sidebar.classList.remove('open'); if (sidebarOverlay) sidebarOverlay.classList.remove('active'); }
+    if (hamburgerBtn) hamburgerBtn.addEventListener('click', openSidebar);
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
     // Helpers
     function formatCurrency(a) { return '₹' + Number(a).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }

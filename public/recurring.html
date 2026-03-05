@@ -7,6 +7,13 @@
     <meta name="description" content="MoneyTrack — Recurring Transactions">
     <title>MoneyTrack — Recurring</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#020617">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="/js/pwa.js" defer></script>
+    <link rel="icon" href="/icons/icon-192.png">
 </head>
 
 <body>
@@ -19,6 +26,9 @@
     <div class="toast-container" id="toast-container"></div>
 
     <div class="app-layout">
+        <!-- Sidebar Overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="brand">💰 MoneyTrack</div>
@@ -37,6 +47,8 @@
                         class="nav-icon">📈</span><span>Analytics</span></a>
                 <a href="/recurring.html" class="nav-link active" data-page="recurring"><span
                         class="nav-icon">🔁</span><span>Recurring</span></a>
+                <a href="/upi.html" class="nav-link" data-page="upi"><span class="nav-icon">⚡</span><span>UPI
+                        Pay</span></a>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-info">
@@ -138,6 +150,26 @@
     </div>
 
     <script src="/js/recurring.js"></script>
+    <script src="/js/pwa.js" defer></script>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <nav class="bottom-nav" id="bottom-nav">
+        <a href="/dashboard.html" class="bottom-nav-item" data-page="dashboard">
+            <span class="bottom-nav-icon">📊</span><span>Home</span>
+        </a>
+        <a href="/transactions.html" class="bottom-nav-item" data-page="transactions">
+            <span class="bottom-nav-icon">💸</span><span>Txns</span>
+        </a>
+        <a href="/budget.html" class="bottom-nav-item" data-page="budget">
+            <span class="bottom-nav-icon">💳</span><span>Budget</span>
+        </a>
+        <a href="/goals.html" class="bottom-nav-item" data-page="goals">
+            <span class="bottom-nav-icon">🎯</span><span>Goals</span>
+        </a>
+        <a href="/upi.html" class="bottom-nav-item" data-page="upi">
+            <span class="bottom-nav-icon">⚡</span><span>UPI</span>
+        </a>
+    </nav>
 </body>
 
 </html>

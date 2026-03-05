@@ -9,8 +9,12 @@
     const sidebar = $('#sidebar');
     const hamburgerBtn = $('#hamburger-btn');
     const sidebarClose = $('#sidebar-close');
-    if (hamburgerBtn) hamburgerBtn.addEventListener('click', () => sidebar.classList.add('open'));
-    if (sidebarClose) sidebarClose.addEventListener('click', () => sidebar.classList.remove('open'));
+    const sidebarOverlay = $('#sidebar-overlay');
+    function openSidebar() { sidebar.classList.add('open'); if (sidebarOverlay) sidebarOverlay.classList.add('active'); }
+    function closeSidebar() { sidebar.classList.remove('open'); if (sidebarOverlay) sidebarOverlay.classList.remove('active'); }
+    if (hamburgerBtn) hamburgerBtn.addEventListener('click', openSidebar);
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
     function formatCurrency(a) { return '₹' + Number(a).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
     function showToast(msg, type = 'success') {
@@ -20,6 +24,29 @@
     }
 
     let networthChart = null;
+    let spendingChart = null;
+    let categoryChart = null;
+
+    const categoryEmojis = {
+        'Food': '🍔', 'Transport': '🚗', 'Rent': '🏠', 'Entertainment': '🎬',
+        'Utilities': '⚡', 'Salary': '💼', 'Other': '📦',
+    };
+
+    const categoryColors = {
+        'Food': '#f97316', 'Transport': '#3b82f6', 'Rent': '#a855f7',
+        'Entertainment': '#ec4899', 'Utilities': '#eab308', 'Salary': '#22c55e', 'Other': '#6b7280',
+    };
+
+    function getMonthLabel(monthStr) {
+        const [year, month] = monthStr.split('-');
+        const date = new Date(year, month - 1);
+        return date.toLocaleDateString('en-IN', { month: 'short' });
+    }
+
+    function getCurrentMonth() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
 
     // Auth
     async function checkAuth() {
@@ -115,6 +142,221 @@
             });
         } catch (err) {
             console.error('Load networth chart error:', err);
+        }
+    }
+
+    // ---- Spending Over Time (Line Chart) ----
+    async function loadSpendingChart() {
+        try {
+            const res = await fetch(`/api/dashboard/monthly?months=6`);
+            const data = await res.json();
+            if (!res.ok || !data.monthly) throw new Error(data.error || 'Failed to load spending data');
+
+            const labels = data.monthly.map(m => getMonthLabel(m.month));
+            const incomeData = data.monthly.map(m => m.income);
+            const expenseData = data.monthly.map(m => m.expense);
+
+            const canvas = document.getElementById('spending-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            if (spendingChart) spendingChart.destroy();
+
+            if (labels.length === 0) {
+                ctx.font = '14px Inter';
+                ctx.fillStyle = '#5e5e6e';
+                ctx.textAlign = 'center';
+                ctx.fillText('No data yet', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                return;
+            }
+
+            spendingChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Income',
+                            data: incomeData,
+                            borderColor: '#34d399',
+                            backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#34d399',
+                            pointBorderColor: '#12121a',
+                            pointBorderWidth: 2,
+                        },
+                        {
+                            label: 'Expenses',
+                            data: expenseData,
+                            borderColor: '#f87171',
+                            backgroundColor: 'rgba(248, 113, 113, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#f87171',
+                            pointBorderColor: '#12121a',
+                            pointBorderWidth: 2,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                            ticks: { color: '#5e5e6e', font: { family: 'Inter', size: 11 } },
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                            ticks: {
+                                color: '#5e5e6e',
+                                font: { family: 'Inter', size: 11 },
+                                callback: (v) => '₹' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v),
+                            },
+                            beginAtZero: true,
+                        },
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#9898a6',
+                                font: { family: 'Inter', size: 12 },
+                                usePointStyle: true,
+                                pointStyleWidth: 10,
+                                padding: 16,
+                            },
+                        },
+                        tooltip: {
+                            backgroundColor: '#1a1a2e',
+                            titleColor: '#f0f0f5',
+                            bodyColor: '#9898a6',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
+                            },
+                        },
+                    },
+                },
+            });
+        } catch (err) {
+            console.error('Failed to load spending chart:', err);
+        }
+    }
+
+    // ---- Category Chart ----
+    async function loadCategoryChart() {
+        try {
+            const month = getCurrentMonth();
+            const res = await fetch(`/api/dashboard/categories?month=${month}`);
+            const data = await res.json();
+            if (!res.ok || !data.categories) throw new Error(data.error || 'Failed to load category data');
+
+            const labels = data.categories.map(c => c.category);
+            const values = data.categories.map(c => c.total);
+            const colors = labels.map(l => categoryColors[l] || '#6b7280');
+            const total = values.reduce((a, b) => a + b, 0);
+
+            const canvas = document.getElementById('category-chart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            if (categoryChart) categoryChart.destroy();
+
+            if (labels.length === 0) {
+                ctx.font = '14px Inter';
+                ctx.fillStyle = '#5e5e6e';
+                ctx.textAlign = 'center';
+                ctx.fillText('No expenses this month', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                return;
+            }
+
+            categoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: '#12121a',
+                        borderWidth: 3,
+                        hoverBorderWidth: 0,
+                        hoverOffset: 8,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#9898a6',
+                                font: { family: 'Inter', size: 12 },
+                                padding: 14,
+                                usePointStyle: true,
+                                pointStyleWidth: 10,
+                                generateLabels: function (chart) {
+                                    const data = chart.data;
+                                    return data.labels.map((label, i) => {
+                                        const value = data.datasets[0].data[i];
+                                        return {
+                                            text: `${categoryEmojis[label] || ''} ${label}  ₹${value.toLocaleString()}`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            strokeStyle: 'transparent',
+                                            index: i,
+                                            hidden: false,
+                                            pointStyle: 'circle',
+                                        };
+                                    });
+                                },
+                            },
+                        },
+                        tooltip: {
+                            backgroundColor: '#1a1a2e',
+                            titleColor: '#f0f0f5',
+                            bodyColor: '#9898a6',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: (ctx) => ` ${formatCurrency(ctx.parsed)}`,
+                            },
+                        },
+                    },
+                },
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: function (chart) {
+                        const { width, height, ctx } = chart;
+                        ctx.restore();
+                        const fontSize = (height / 10).toFixed(2);
+                        ctx.font = `700 ${fontSize}px Inter`;
+                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = 'center';
+
+                        const centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
+                        const centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+
+                        ctx.fillStyle = '#f0f0f5';
+                        const totalText = '₹' + (total >= 1000 ? (total / 1000).toFixed(1) + 'k' : total.toFixed(0));
+                        ctx.fillText(totalText, centerX, centerY);
+                        ctx.save();
+                    },
+                }],
+            });
+        } catch (err) {
+            console.error('Failed to load category chart:', err);
         }
     }
 
@@ -219,6 +461,8 @@
 
         await Promise.all([
             loadNetworthChart(),
+            loadSpendingChart(),
+            loadCategoryChart(),
             loadHeatmap(currentYear),
             loadInsights(),
         ]);

@@ -7,7 +7,7 @@ const path = require('path');
 const { initDatabase } = require('./db/database');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/moneytrack';
 
@@ -25,7 +25,8 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:"],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+            workerSrc: ["'self'"],
         },
     },
 }));
